@@ -1,9 +1,61 @@
-// Application state
-let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
-let neetcodeProgress = JSON.parse(localStorage.getItem('neetcodeProgress')) || {};
-let dsaProgress = JSON.parse(localStorage.getItem('dsaProgress')) || {};
-let algorithmsProgress = JSON.parse(localStorage.getItem('algorithmsProgress')) || {};
-let personalCourses = JSON.parse(localStorage.getItem('personalCourses')) || [];
+// User-specific data management
+class UserDataManager {
+    constructor() {
+        this.currentUser = null;
+        this.initializeUser();
+    }
+
+    initializeUser() {
+        const savedUser = localStorage.getItem('productivefire_user');
+        if (savedUser) {
+            this.currentUser = JSON.parse(savedUser);
+        }
+    }
+
+    getUserKey(key) {
+        if (!this.currentUser || !this.currentUser.email) {
+            return key; // fallback for legacy data
+        }
+        return `${this.currentUser.email}_${key}`;
+    }
+
+    setUserData(key, data) {
+        const userKey = this.getUserKey(key);
+        localStorage.setItem(userKey, JSON.stringify(data));
+    }
+
+    getUserData(key, defaultValue = null) {
+        const userKey = this.getUserKey(key);
+        const data = localStorage.getItem(userKey);
+        return data ? JSON.parse(data) : defaultValue;
+    }
+
+    clearUserData() {
+        if (!this.currentUser || !this.currentUser.email) return;
+        
+        const keysToRemove = [];
+        const userPrefix = `${this.currentUser.email}_`;
+        
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(userPrefix)) {
+                keysToRemove.push(key);
+            }
+        }
+        
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+    }
+}
+
+// Initialize user data manager
+const userDataManager = new UserDataManager();
+
+// Application state - now user-specific
+let tasks = userDataManager.getUserData('tasks', []);
+let neetcodeProgress = userDataManager.getUserData('neetcodeProgress', {});
+let dsaProgress = userDataManager.getUserData('dsaProgress', {});
+let algorithmsProgress = userDataManager.getUserData('algorithmsProgress', {});
+let personalCourses = userDataManager.getUserData('personalCourses', []);
 let currentEditingTask = null;
 let currentEditingCourse = null;
 
@@ -321,7 +373,7 @@ function toggleNeetcodeProblem(problemTitle) {
         delete neetcodeProgress[problemTitle];
     }
     
-    localStorage.setItem('neetcodeProgress', JSON.stringify(neetcodeProgress));
+    saveNeetcodeProgress();
     renderNeetcodeProblems();
     updateStats();
     updateAnalytics();
@@ -400,7 +452,7 @@ function toggleDSAProblem(problemTitle) {
         delete dsaProgress[problemTitle];
     }
     
-    localStorage.setItem('dsaProgress', JSON.stringify(dsaProgress));
+    saveDSAProgress();
     renderDSAProblems();
     updateStats();
     updateAnalytics();
@@ -470,7 +522,7 @@ function toggleAlgorithm(algorithmName) {
         delete algorithmsProgress[algorithmName];
     }
     
-    localStorage.setItem('algorithmsProgress', JSON.stringify(algorithmsProgress));
+    saveAlgorithmsProgress();
     renderAlgorithms();
     updateStats();
 }
@@ -646,7 +698,7 @@ function saveCourse() {
         personalCourses.push(courseData);
     }
     
-    localStorage.setItem('personalCourses', JSON.stringify(personalCourses));
+    savePersonalCourses();
     renderPersonalCourses();
     updateStats();
     closeCourseModal();
@@ -655,7 +707,7 @@ function saveCourse() {
 function deleteCourse(courseId) {
     if (confirm('Are you sure you want to delete this course?')) {
         personalCourses = personalCourses.filter(c => c.id !== courseId);
-        localStorage.setItem('personalCourses', JSON.stringify(personalCourses));
+        savePersonalCourses();
         renderPersonalCourses();
         updateStats();
     }
@@ -830,53 +882,8 @@ class RobotCompanion {
     }
     
     playSound(type, frequency = 440, duration = 200) {
-        if (!this.soundEnabled || !this.audioContext) return;
-        
-        const oscillator = this.audioContext.createOscillator();
-        const gainNode = this.audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
-        
-        switch(type) {
-            case 'happy':
-                // Happy ascending beep
-                oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.5, this.audioContext.currentTime + duration / 1000);
-                oscillator.type = 'sine';
-                break;
-            case 'celebration':
-                // Celebration chime
-                oscillator.frequency.setValueAtTime(523, this.audioContext.currentTime); // C note
-                oscillator.frequency.setValueAtTime(659, this.audioContext.currentTime + 0.1); // E note
-                oscillator.frequency.setValueAtTime(784, this.audioContext.currentTime + 0.2); // G note
-                oscillator.type = 'triangle';
-                duration = 300;
-                break;
-            case 'thinking':
-                // Thoughtful low hum
-                oscillator.frequency.setValueAtTime(220, this.audioContext.currentTime);
-                oscillator.type = 'sawtooth';
-                duration = 150;
-                break;
-            case 'greeting':
-                // Friendly chirp
-                oscillator.frequency.setValueAtTime(660, this.audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(880, this.audioContext.currentTime + 0.1);
-                oscillator.frequency.exponentialRampToValueAtTime(440, this.audioContext.currentTime + 0.2);
-                oscillator.type = 'square';
-                duration = 250;
-                break;
-            default:
-                oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
-                oscillator.type = 'sine';
-        }
-        
-        gainNode.gain.setValueAtTime(0.1, this.audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration / 1000);
-        
-        oscillator.start(this.audioContext.currentTime);
-        oscillator.stop(this.audioContext.currentTime + duration / 1000);
+        // Sound effects disabled for better user experience
+        return;
     }
     
     init() {
@@ -1406,6 +1413,20 @@ class UserAuth {
     
     showMainApp() {
         document.getElementById('mainApp').style.display = 'block';
+        
+        // Reinitialize user data manager with the new user
+        userDataManager.initializeUser();
+        
+        // Reload user-specific data
+        tasks = userDataManager.getUserData('tasks', []);
+        neetcodeProgress = userDataManager.getUserData('neetcodeProgress', {});
+        dsaProgress = userDataManager.getUserData('dsaProgress', {});
+        algorithmsProgress = userDataManager.getUserData('algorithmsProgress', {});
+        personalCourses = userDataManager.getUserData('personalCourses', []);
+        
+        // Re-render everything with user-specific data
+        initializeApp();
+        
         this.showUserProfile();
     }
     
@@ -1888,7 +1909,23 @@ function generateId() {
 }
 
 function saveTasks() {
-    localStorage.setItem('tasks', JSON.stringify(tasks));
+    userDataManager.setUserData('tasks', tasks);
+}
+
+function saveNeetcodeProgress() {
+    userDataManager.setUserData('neetcodeProgress', neetcodeProgress);
+}
+
+function saveDSAProgress() {
+    userDataManager.setUserData('dsaProgress', dsaProgress);
+}
+
+function saveAlgorithmsProgress() {
+    userDataManager.setUserData('algorithmsProgress', algorithmsProgress);
+}
+
+function savePersonalCourses() {
+    userDataManager.setUserData('personalCourses', personalCourses);
 }
 
 function formatDeadline(deadline) {
