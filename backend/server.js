@@ -47,6 +47,13 @@ if (process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1') {
 
 writeLog('INFO', 'ProductiveFire Backend starting...');
 
+// Trust proxy settings for deployment environments
+if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
+    app.set('trust proxy', 1); // Trust first proxy for production/Vercel
+} else {
+    app.set('trust proxy', false); // Don't trust proxy in development
+}
+
 // Security middleware
 app.use(helmet({
     contentSecurityPolicy: {
@@ -74,10 +81,21 @@ app.use(cors({
 // Serve static files from the parent directory (frontend)
 app.use(express.static(path.join(__dirname, '..')));
 
-// Rate limiting
+// Rate limiting with proper proxy handling
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // limit each IP to 100 requests per windowMs
+    max: 100, // limit each IP to 100 requests per windowMs
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    // Use a custom key generator that handles proxy scenarios
+    keyGenerator: (req) => {
+        // In production with trusted proxy, use forwarded IP
+        if (app.get('trust proxy')) {
+            return req.ip;
+        }
+        // In development, use connection remote address
+        return req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+    }
 });
 app.use(limiter);
 
@@ -301,6 +319,11 @@ const validateSignin = [
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Handle Chrome DevTools requests (suppress warnings)
+app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
+    res.status(404).end();
 });
 
 // Default route - redirect to home

@@ -61,8 +61,42 @@ let currentEditingCourse = null;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🟢 DOM Content Loaded - Starting app initialization');
+    
+    // Initialize main app components
     initializeApp();
     setupEventListeners();
+    
+    // Initialize user authentication
+    console.log('📱 Setting up authentication');
+    userAuth = new UserAuth();
+    
+    // Initialize robot only when main app is visible
+    const mainApp = document.getElementById('mainApp');
+    if (mainApp && mainApp.style.display !== 'none') {
+        // If main app is already visible, init robot immediately
+        setTimeout(() => {
+            robot = new RobotCompanion();
+        }, 500);
+    }
+    
+    // Watch for when main app becomes visible
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                if (mainApp && mainApp.style.display !== 'none' && !robot) {
+                    // Initialize robot when main app becomes visible
+                    setTimeout(() => {
+                        robot = new RobotCompanion();
+                    }, 1000);
+                }
+            }
+        });
+    });
+    
+    if (mainApp) {
+        observer.observe(mainApp, { attributes: true });
+    }
 });
 
 function initializeApp() {
@@ -1339,41 +1373,56 @@ class UserAuth {
             });
         });
 
-        // Form submissions
-        document.getElementById('signInForm').addEventListener('submit', (e) => this.handleSignIn(e));
-        document.getElementById('signUpForm').addEventListener('submit', (e) => this.handleSignUp(e));
-        document.getElementById('profileForm').addEventListener('submit', (e) => this.handleProfileUpdate(e));
+        // Form submissions - check if forms exist first
+        const signInForm = document.getElementById('signInForm');
+        const signUpForm = document.getElementById('signUpForm');
+        const profileForm = document.getElementById('profileForm');
+        
+        if (signInForm) signInForm.addEventListener('submit', (e) => this.handleSignIn(e));
+        if (signUpForm) signUpForm.addEventListener('submit', (e) => this.handleSignUp(e));
+        if (profileForm) profileForm.addEventListener('submit', (e) => this.handleProfileUpdate(e));
         
         // Modal switching
-        document.getElementById('switchToSignUp').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.hideModals();
-            this.showSignUpModal();
-        });
-        document.getElementById('switchToSignIn').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.hideModals();
-            this.showSignInModal();
-        });
+        const switchToSignUp = document.getElementById('switchToSignUp');
+        const switchToSignIn = document.getElementById('switchToSignIn');
         
-        // Form submissions
-        document.getElementById('signInForm').addEventListener('submit', (e) => this.handleSignIn(e));
-        document.getElementById('signUpForm').addEventListener('submit', (e) => this.handleSignUp(e));
-        document.getElementById('profileForm').addEventListener('submit', (e) => this.handleProfileUpdate(e));
+        if (switchToSignUp) {
+            switchToSignUp.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.hideModals();
+                this.showSignUpModal();
+            });
+        }
+        
+        if (switchToSignIn) {
+            switchToSignIn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.hideModals();
+                this.showSignInModal();
+            });
+        }
         
         // Avatar upload
-        document.getElementById('changeAvatarBtn').addEventListener('click', () => {
-            document.getElementById('avatarUpload').click();
-        });
-        document.getElementById('avatarUpload').addEventListener('change', (e) => this.handleAvatarUpload(e));
+        const changeAvatarBtn = document.getElementById('changeAvatarBtn');
+        const avatarUpload = document.getElementById('avatarUpload');
         
-        // Settings
-        document.getElementById('soundToggle').addEventListener('change', (e) => {
-            if (robot) {
-                robot.soundEnabled = e.target.checked;
-            }
-            this.saveUserSettings();
-        });
+        if (changeAvatarBtn && avatarUpload) {
+            changeAvatarBtn.addEventListener('click', () => {
+                avatarUpload.click();
+            });
+            avatarUpload.addEventListener('change', (e) => this.handleAvatarUpload(e));
+        }
+        
+        // Settings - check if elements exist
+        const soundToggle = document.getElementById('soundToggle');
+        if (soundToggle) {
+            soundToggle.addEventListener('change', (e) => {
+                if (robot) {
+                    robot.soundEnabled = e.target.checked;
+                }
+                this.saveUserSettings();
+            });
+        }
         
         // Close modals
         document.querySelectorAll('.close').forEach(btn => {
@@ -1439,13 +1488,31 @@ class UserAuth {
     }
     
     showUserMenu() {
-        document.getElementById('userMenuModal').style.display = 'block';
+        const userMenuModal = document.getElementById('userMenuModal');
+        userMenuModal.classList.remove('closing'); // Remove any closing class
+        userMenuModal.classList.add('active'); // Use class instead of inline style
+        userMenuModal.style.display = 'flex'; // Ensure flex display
         this.populateUserMenu();
     }
     
     hideModals() {
-        document.querySelectorAll('.modal').forEach(modal => {
+        const userMenuModal = document.getElementById('userMenuModal');
+        
+        // Special handling for user menu modal with explode animation
+        if (userMenuModal && (userMenuModal.classList.contains('active') || userMenuModal.style.display !== 'none')) {
+            userMenuModal.classList.add('closing');
+            
+            // Wait for animation to complete before hiding
+            setTimeout(() => {
+                userMenuModal.style.display = 'none';
+                userMenuModal.classList.remove('closing', 'active');
+            }, 400); // Match animation duration
+        }
+        
+        // Hide other modals immediately
+        document.querySelectorAll('.modal:not(#userMenuModal)').forEach(modal => {
             modal.style.display = 'none';
+            modal.classList.remove('active');
         });
     }
     
@@ -1630,9 +1697,15 @@ class UserAuth {
     }
     
     populateUserMenu() {
-        document.getElementById('profileName').value = this.currentUser.name;
-        document.getElementById('profileEmail').value = this.currentUser.email;
-        document.getElementById('soundToggle').checked = this.currentUser.settings?.soundEnabled ?? true;
+        const profileName = document.getElementById('profileName');
+        const profileEmail = document.getElementById('profileEmail');
+        const soundToggle = document.getElementById('soundToggle');
+        
+        if (!profileName || !profileEmail || !soundToggle || !this.currentUser) return;
+        
+        profileName.value = this.currentUser.name;
+        profileEmail.value = this.currentUser.email;
+        soundToggle.checked = this.currentUser.settings?.soundEnabled ?? true;
         document.getElementById('notificationsToggle').checked = this.currentUser.settings?.notificationsEnabled ?? true;
         
         // Update large avatar
@@ -1654,9 +1727,12 @@ class UserAuth {
     saveUserSettings() {
         if (!this.currentUser) return;
         
+        const soundToggle = document.getElementById('soundToggle');
+        const notificationsToggle = document.getElementById('notificationsToggle');
+        
         this.currentUser.settings = {
-            soundEnabled: document.getElementById('soundToggle').checked,
-            notificationsEnabled: document.getElementById('notificationsToggle').checked
+            soundEnabled: soundToggle ? soundToggle.checked : true,
+            notificationsEnabled: notificationsToggle ? notificationsToggle.checked : true
         };
         
         localStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
@@ -1688,41 +1764,6 @@ class UserAuth {
 
 // Initialize user authentication
 let userAuth;
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🟢 DOM Content Loaded - Starting authentication setup');
-    
-    // Always use localStorage authentication for the main app
-    console.log('📱 Using localStorage authentication');
-    userAuth = new UserAuth();
-    console.log('📱 Using localStorage authentication');
-    
-    // Initialize robot only when main app is visible
-    const mainApp = document.getElementById('mainApp');
-    if (mainApp && mainApp.style.display !== 'none') {
-        // If main app is already visible, init robot immediately
-        setTimeout(() => {
-            robot = new RobotCompanion();
-        }, 500);
-    }
-    
-    // Watch for when main app becomes visible
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-                if (mainApp.style.display !== 'none' && !robot) {
-                    // Initialize robot when main app becomes visible
-                    setTimeout(() => {
-                        robot = new RobotCompanion();
-                    }, 1000);
-                }
-            }
-        });
-    });
-    
-    if (mainApp) {
-        observer.observe(mainApp, { attributes: true });
-    }
-});
 
 // Statistics and Analytics
 function updateStats() {

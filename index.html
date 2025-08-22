@@ -6,7 +6,9 @@
     <title>Task Tracker Pro - NeetCode & More</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="premium-effects.css">
     <script src="theme-manager.js"></script>
+    <script src="premium-effects.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -30,11 +32,11 @@
     <div id="mainApp">
     <div class="container">
         <!-- Header -->
-        <header class="header">
+        <header class="header glass-effect">
             <div class="header-content">
                 <div class="logo">
-                    <i class="fas fa-check-circle"></i>
-                    <h1>Task Tracker Pro</h1>
+                    <i class="fas fa-check-circle neon-glow"></i>
+                    <h1 class="gradient-text">Task Tracker Pro</h1>
                 </div>
                 <div class="user-profile">
                     <div id="userSignedIn" class="user-info">
@@ -93,11 +95,11 @@
         <!-- General Tasks Tab -->
         <div class="tab-content active" id="general">
             <div class="section-header">
-                <h2>
+                <h2 class="gradient-text">
                     <i class="fas fa-clipboard-list"></i>
                     General Tasks
                 </h2>
-                <button class="btn btn-primary" onclick="openTaskModal()">
+                <button class="btn-premium float-animation" onclick="openTaskModal()">
                     <i class="fas fa-plus"></i>
                     Add Task
                 </button>
@@ -520,32 +522,109 @@
                             <input type="email" id="profileEmail">
                         </div>
                         <div class="settings-section">
-                            <h3>Settings</h3>
-                            <div class="setting-item">
-                                <label class="switch">
-                                    <input type="checkbox" id="themeToggle">
-                                    <span class="slider"></span>
-                                </label>
-                                <span>Dark Theme</span>
-                            </div>
-                            <div class="setting-item" style="display: none;">
-                                <label class="switch">
-                                    <input type="checkbox" id="soundToggle" disabled>
-                                    <span class="slider"></span>
-                                </label>
-                                <span>Robot Sound Effects (Disabled)</span>
-                            </div>
-                            <div class="setting-item">
-                                <label class="switch">
-                                    <input type="checkbox" id="notificationsToggle" checked>
-                                    <span class="slider"></span>
-                                </label>
-                                <span>Browser Notifications</span>
+                            <h3 class="gradient-text">⚙️ Preferences</h3>
+                            <div class="settings-grid">
+                                <div class="setting-card morph-card">
+                                    <div class="setting-header">
+                                        <div class="setting-icon">
+                                            <i class="fas fa-moon"></i>
+                                        </div>
+                                        <div class="setting-info">
+                                            <h4>Dark Theme</h4>
+                                            <p>Switch between light and dark appearance</p>
+                                        </div>
+                                    </div>
+                                    <div class="setting-control">
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="themeToggle">
+                                            <span class="premium-slider">
+                                                <span class="slider-track"></span>
+                                                <span class="slider-thumb">
+                                                    <i class="fas fa-sun light-icon"></i>
+                                                    <i class="fas fa-moon dark-icon"></i>
+                                                </span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="setting-card morph-card">
+                                    <div class="setting-header">
+                                        <div class="setting-icon">
+                                            <i class="fas fa-bell"></i>
+                                        </div>
+                                        <div class="setting-info">
+                                            <h4>Notifications</h4>
+                                            <p>Get notified about important updates</p>
+                                        </div>
+                                    </div>
+                                    <div class="setting-control">
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="notificationsToggle" checked>
+                                            <span class="premium-slider">
+                                                <span class="slider-track"></span>
+                                                <span class="slider-thumb">
+                                                    <i class="fas fa-bell-slash off-icon"></i>
+                                                    <i class="fas fa-bell on-icon"></i>
+                                                </span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="setting-card morph-card">
+                                    <div class="setting-header">
+                                        <div class="setting-icon">
+                                            <i class="fas fa-palette"></i>
+                                        </div>
+                                        <div class="setting-info">
+                                            <h4>Interface</h4>
+                                            <p>Customize your visual experience</p>
+                                        </div>
+                                    </div>
+                                    <div class="setting-control">
+                                        <select id="interfaceStyle" class="premium-select">
+                                            <option value="modern">Modern</option>
+                                            <option value="classic">Classic</option>
+                                            <option value="minimal">Minimal</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="setting-card morph-card">
+                                    <div class="setting-header">
+                                        <div class="setting-icon">
+                                            <i class="fas fa-chart-line"></i>
+                                        </div>
+                                        <div class="setting-info">
+                                            <h4>Analytics</h4>
+                                            <p>Track your productivity insights</p>
+                                        </div>
+                                    </div>
+                                    <div class="setting-control">
+                                        <label class="premium-switch">
+                                            <input type="checkbox" id="analyticsToggle" checked>
+                                            <span class="premium-slider">
+                                                <span class="slider-track"></span>
+                                                <span class="slider-thumb">
+                                                    <i class="fas fa-chart-line on-icon"></i>
+                                                    <i class="fas fa-chart-line off-icon"></i>
+                                                </span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div class="form-actions">
-                            <button type="submit" class="btn-primary">Save Changes</button>
-                            <button type="button" id="signOutBtn" class="btn-danger">Sign Out</button>
+                            <button type="submit" class="btn-premium ripple">
+                                <i class="fas fa-save"></i>
+                                Save Changes
+                            </button>
+                            <button type="button" id="signOutBtn" class="btn-danger ripple">
+                                <i class="fas fa-sign-out-alt"></i>
+                                Sign Out
+                            </button>
                         </div>
                     </form>
                 </div>
