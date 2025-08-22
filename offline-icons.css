@@ -1,0 +1,59 @@
+/* Offline Icon Fallbacks */
+/* When internet is disconnected, use Unicode symbols instead of Font Awesome */
+
+.fas, .fa {
+    font-family: Arial, sans-serif;
+    font-style: normal;
+    font-weight: normal;
+    display: inline-block;
+    min-width: 1em;
+    text-align: center;
+}
+
+/* Icon replacements with Unicode symbols */
+.fa-check-circle:before { content: "✓"; color: #4ecdc4; font-weight: bold; }
+.fa-plus:before { content: "+"; font-weight: bold; }
+.fa-tasks:before { content: "📋"; }
+.fa-brain:before { content: "🧠"; }
+.fa-code:before { content: "💻"; }
+.fa-graduation-cap:before { content: "🎓"; }
+.fa-chart-line:before { content: "📊"; }
+.fa-clipboard-list:before { content: "📝"; }
+.fa-cogs:before { content: "⚙️"; }
+.fa-globe:before { content: "🌐"; }
+.fa-bookmark:before { content: "🔖"; }
+.fa-times:before { content: "✕"; font-weight: bold; font-size: 1.2em; }
+.fa-moon:before { content: "🌙"; }
+.fa-sun:before { content: "☀️"; }
+.fa-bell:before { content: "🔔"; }
+.fa-bell-slash:before { content: "🔕"; }
+.fa-palette:before { content: "🎨"; }
+.fa-save:before { content: "💾"; }
+.fa-sign-out-alt:before { content: "🚪"; }
+.fa-fire:before { content: "🔥"; }
+.fa-tint:before { content: "💧"; }
+.fa-user:before { content: "👤"; }
+.fa-email:before { content: "📧"; }
+.fa-lock:before { content: "🔒"; }
+.fa-eye:before { content: "👁"; }
+.fa-eye-slash:before { content: "🙈"; }
+.fa-spinner:before { content: "⏳"; }
+.fa-check:before { content: "✓"; color: #28a745; }
+.fa-exclamation-triangle:before { content: "⚠️"; }
+.fa-info-circle:before { content: "ℹ️"; }
+
+/* Special styling for logo */
+.neon-glow {
+    color: #4ecdc4;
+    text-shadow: 0 0 10px #4ecdc4;
+}
+
+/* Animation for spinner */
+.fa-spinner {
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

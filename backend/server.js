@@ -59,7 +59,8 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+            scriptSrcAttr: ["'self'", "'unsafe-inline'"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
             imgSrc: ["'self'", "data:", "https:"],
@@ -84,17 +85,21 @@ app.use(express.static(path.join(__dirname, '..')));
 // Rate limiting with proper proxy handling
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    max: 500, // Increased limit for development
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    // Skip rate limiting for development
+    skip: (req) => {
+        return process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1';
+    },
     // Use a custom key generator that handles proxy scenarios
     keyGenerator: (req) => {
         // In production with trusted proxy, use forwarded IP
         if (app.get('trust proxy')) {
             return req.ip;
         }
-        // In development, use connection remote address
-        return req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+        // In development, use connection remote address or fallback
+        return req.connection?.remoteAddress || req.socket?.remoteAddress || req.ip || 'localhost';
     }
 });
 app.use(limiter);
