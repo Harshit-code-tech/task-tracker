@@ -110,6 +110,13 @@ async function cleanupLogs() {
     try {
         log('\n🧹 Cleaning up log files...', 'cyan');
         
+        // Skip log file operations in serverless environments
+        if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production') {
+            logInfo('Log file cleanup skipped in serverless environment');
+            logInfo('Logs are handled by the serverless platform (Vercel)');
+            return;
+        }
+        
         if (fs.existsSync(LOG_FILE)) {
             const stats = fs.statSync(LOG_FILE);
             const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);

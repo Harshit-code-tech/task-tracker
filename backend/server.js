@@ -15,22 +15,36 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// File logging system
+// Serverless-compatible logging system
 const logFile = path.join(__dirname, '..', 'app.log');
 
 function writeLog(level, message, data = null) {
     const timestamp = new Date().toISOString();
-    const logEntry = `[${timestamp}] [${level}] ${message}${data ? ' | Data: ' + JSON.stringify(data) : ''}\n`;
+    const logEntry = `[${timestamp}] [${level}] ${message}${data ? ' | Data: ' + JSON.stringify(data) : ''}`;
     
-    // Write to console
-    console.log(logEntry.trim());
+    // Always write to console (Vercel captures this)
+    console.log(logEntry);
     
-    // Write to file
-    fs.appendFileSync(logFile, logEntry);
+    // Only write to file if not in serverless environment
+    if (process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1') {
+        try {
+            fs.appendFileSync(logFile, logEntry + '\n');
+        } catch (error) {
+            // Silently fail if can't write to file (serverless environment)
+            console.log('File logging disabled in serverless environment');
+        }
+    }
 }
 
-// Clear log file on startup
-fs.writeFileSync(logFile, `=== Server Started at ${new Date().toISOString()} ===\n`);
+// Initialize logging (only in local development)
+if (process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1') {
+    try {
+        fs.writeFileSync(logFile, `=== Server Started at ${new Date().toISOString()} ===\n`);
+    } catch (error) {
+        // Silently fail if can't write to file
+    }
+}
+
 writeLog('INFO', 'ProductiveFire Backend starting...');
 
 // Security middleware
