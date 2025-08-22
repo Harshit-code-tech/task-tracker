@@ -82,7 +82,7 @@ class LoginManager {
         AuthUtils.showLoading('loginBtn');
         
         try {
-            const response = await AuthUtils.makeRequest('/api/auth/signin', {
+            const response = await AuthUtils.makeRequest('/auth/signin', {
                 method: 'POST',
                 body: JSON.stringify({ email, password })
             });

@@ -112,7 +112,7 @@ class EmailVerificationManager {
         AuthUtils.showLoading('verifyBtn');
         
         try {
-            const response = await AuthUtils.makeRequest('/api/auth/verify-signup', {
+            const response = await AuthUtils.makeRequest('/auth/verify-signup', {
                 method: 'POST',
                 body: JSON.stringify({ 
                     email: this.userEmail, 
@@ -161,7 +161,7 @@ class EmailVerificationManager {
         AuthUtils.showLoading('resendCode');
         
         try {
-            const response = await AuthUtils.makeRequest('/api/auth/send-signup-otp', {
+            const response = await AuthUtils.makeRequest('/auth/send-signup-otp', {
                 method: 'POST',
                 body: JSON.stringify({ email: this.userEmail })
             });

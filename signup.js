@@ -218,7 +218,7 @@ class SignupManager {
         
         try {
             // Send OTP first
-            const response = await AuthUtils.makeRequest('/api/auth/send-signup-otp', {
+            const response = await AuthUtils.makeRequest('/auth/send-signup-otp', {
                 method: 'POST',
                 body: JSON.stringify({ email: this.userEmail })
             });
@@ -257,7 +257,7 @@ class SignupManager {
         AuthUtils.showLoading('verifyOtpBtn');
         
         try {
-            const response = await AuthUtils.makeRequest('/api/auth/verify-signup', {
+            const response = await AuthUtils.makeRequest('/auth/verify-signup', {
                 method: 'POST',
                 body: JSON.stringify({
                     email: this.userEmail,
@@ -292,7 +292,7 @@ class SignupManager {
         AuthUtils.showLoading('resendOtp');
         
         try {
-            const response = await AuthUtils.makeRequest('/api/auth/send-signup-otp', {
+            const response = await AuthUtils.makeRequest('/auth/send-signup-otp', {
                 method: 'POST',
                 body: JSON.stringify({ email: this.userEmail })
             });
