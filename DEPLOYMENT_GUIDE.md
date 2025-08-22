@@ -36,7 +36,7 @@ In Vercel Dashboard → Project Settings → Environment Variables, add:
 ```env
 NODE_ENV=production
 JWT_SECRET=your-secure-64-character-jwt-secret
-MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/productivefire
+MONGODB_URI=(provided by mongodb)
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=your-email@gmail.com

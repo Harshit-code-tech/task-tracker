@@ -47,7 +47,7 @@ NODE_ENV=development
 JWT_SECRET=your-super-secure-jwt-secret-key-here
 
 # Your MongoDB Atlas connection string
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/productivefire
+MONGODB_URI=(provided by mongodb)
 
 # Email settings (optional - for notifications)
 EMAIL_USER=your-email@gmail.com
