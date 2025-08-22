@@ -1329,6 +1329,13 @@ class UserAuth {
     constructor() {
         this.currentUser = null;
         this.users = JSON.parse(localStorage.getItem('taskTrackerUsers')) || {};
+        
+        // Check storage and cleanup if needed
+        this.checkStorageQuota();
+        if (!this.checkStorageQuota()) {
+            this.cleanupOldData();
+        }
+        
         this.init();
     }
     
@@ -1599,38 +1606,176 @@ class UserAuth {
         const name = document.getElementById('profileName').value;
         const email = document.getElementById('profileEmail').value;
         
-        this.currentUser.name = name;
-        this.currentUser.email = email;
+        // Validate inputs
+        if (!name.trim()) {
+            alert('Please enter a valid name');
+            return;
+        }
         
-        // Update in users database
-        delete this.users[this.currentUser.email];
-        this.users[email] = this.currentUser;
+        if (!email.trim() || !email.includes('@')) {
+            alert('Please enter a valid email address');
+            return;
+        }
         
-        localStorage.setItem('taskTrackerUsers', JSON.stringify(this.users));
-        localStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
-        
-        this.showUserProfile();
-        this.hideModals();
-        
-        if (robot) {
-            robot.say('Profile updated! ✅');
-            robot.react('happy');
+        try {
+            const oldEmail = this.currentUser.email;
+            this.currentUser.name = name;
+            this.currentUser.email = email;
+            
+            // Update in users database
+            if (oldEmail !== email) {
+                delete this.users[oldEmail];
+            }
+            this.users[email] = this.currentUser;
+            
+            localStorage.setItem('taskTrackerUsers', JSON.stringify(this.users));
+            localStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+            
+            this.showUserProfile();
+            this.hideModals();
+            
+            if (robot) {
+                robot.say('Profile updated! ✅');
+                robot.react('happy');
+            }
+        } catch (error) {
+            console.error('Profile update error:', error);
+            alert('Failed to update profile. Storage quota may be exceeded.');
         }
     }
     
     handleAvatarUpload(e) {
         const file = e.target.files[0];
         if (file) {
+            // Check file size (limit to 2MB)
+            if (file.size > 2 * 1024 * 1024) {
+                alert('Please select an image smaller than 2MB');
+                return;
+            }
+            
+            // Check file type
+            if (!file.type.startsWith('image/')) {
+                alert('Please select a valid image file');
+                return;
+            }
+            
             const reader = new FileReader();
             reader.onload = (e) => {
-                const avatarData = e.target.result;
-                this.currentUser.avatar = avatarData;
-                localStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
-                this.users[this.currentUser.email] = this.currentUser;
-                localStorage.setItem('taskTrackerUsers', JSON.stringify(this.users));
-                this.updateAvatarDisplay();
+                const img = new Image();
+                img.onload = () => {
+                    // Compress image
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Calculate new dimensions (max 150x150)
+                    const maxSize = 150;
+                    let { width, height } = img;
+                    
+                    if (width > height) {
+                        if (width > maxSize) {
+                            height = (height * maxSize) / width;
+                            width = maxSize;
+                        }
+                    } else {
+                        if (height > maxSize) {
+                            width = (width * maxSize) / height;
+                            height = maxSize;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    // Draw and compress
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const compressedData = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    try {
+                        this.currentUser.avatar = compressedData;
+                        localStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+                        this.users[this.currentUser.email] = this.currentUser;
+                        localStorage.setItem('taskTrackerUsers', JSON.stringify(this.users));
+                        this.updateAvatarDisplay();
+                        
+                        if (robot) {
+                            robot.say('Avatar updated! Looking good! 📸');
+                            robot.react('happy');
+                        }
+                    } catch (error) {
+                        console.error('Storage error:', error);
+                        alert('Failed to save avatar. Storage quota exceeded. Please try a smaller image.');
+                        // Reset file input
+                        e.target.value = '';
+                    }
+                };
+                img.src = e.target.result;
             };
             reader.readAsDataURL(file);
+        }
+    }
+    
+    // Storage management
+    checkStorageQuota() {
+        try {
+            const used = JSON.stringify(localStorage).length;
+            const maxSize = 5 * 1024 * 1024; // 5MB estimate for localStorage
+            
+            if (used > maxSize * 0.9) { // 90% full
+                console.warn('Storage is nearly full. Consider clearing old data.');
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error('Storage check failed:', error);
+            return false;
+        }
+    }
+    
+    cleanupOldData() {
+        try {
+            // Remove old temporary data
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.includes('temp_') || key.includes('cache_'))) {
+                    keysToRemove.push(key);
+                }
+            }
+            
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            
+            // If still too full, offer to reset avatar data
+            if (!this.checkStorageQuota()) {
+                const resetAvatars = confirm(
+                    'Storage is full. Would you like to clear avatar data to free up space? This will reset all user avatars.'
+                );
+                
+                if (resetAvatars) {
+                    // Remove all avatar data
+                    Object.keys(this.users).forEach(email => {
+                        if (this.users[email].avatar) {
+                            delete this.users[email].avatar;
+                        }
+                    });
+                    
+                    if (this.currentUser && this.currentUser.avatar) {
+                        delete this.currentUser.avatar;
+                        localStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+                    }
+                    
+                    localStorage.setItem('taskTrackerUsers', JSON.stringify(this.users));
+                    
+                    if (robot) {
+                        robot.say('Storage cleaned! Avatars reset. 🧹');
+                    }
+                }
+            }
+            
+            if (robot && keysToRemove.length > 0) {
+                robot.say(`Cleaned up ${keysToRemove.length} temporary files! 🧹`);
+            }
+        } catch (error) {
+            console.error('Cleanup failed:', error);
         }
     }
     
@@ -1682,18 +1827,30 @@ class UserAuth {
         const avatar = document.getElementById('userAvatar');
         const initials = document.getElementById('userInitials');
         
-        if (!avatar || !initials || !this.currentUser) return;
+        if (!avatar || !initials || !this.currentUser) {
+            console.warn('Avatar elements not found or user not logged in');
+            return;
+        }
         
         if (this.currentUser.avatar) {
             avatar.src = this.currentUser.avatar;
             avatar.style.display = 'block';
+            avatar.style.visibility = 'visible';
+            avatar.style.opacity = '1';
             initials.style.display = 'none';
         } else {
-            const userInitials = this.currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase();
+            const userInitials = this.currentUser.name ? 
+                this.currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase() : 
+                '??';
             initials.textContent = userInitials;
             avatar.style.display = 'none';
             initials.style.display = 'flex';
+            initials.style.visibility = 'visible';
+            initials.style.opacity = '1';
         }
+        
+        // Also update the profile display
+        this.populateUserMenu();
     }
     
     populateUserMenu() {
@@ -1701,26 +1858,55 @@ class UserAuth {
         const profileEmail = document.getElementById('profileEmail');
         const soundToggle = document.getElementById('soundToggle');
         
-        if (!profileName || !profileEmail || !soundToggle || !this.currentUser) return;
+        if (!profileName || !profileEmail || !soundToggle || !this.currentUser) {
+            console.warn('Profile elements not found or user not logged in');
+            return;
+        }
         
-        profileName.value = this.currentUser.name;
-        profileEmail.value = this.currentUser.email;
+        // Populate form fields
+        profileName.value = this.currentUser.name || '';
+        profileEmail.value = this.currentUser.email || '';
         soundToggle.checked = this.currentUser.settings?.soundEnabled ?? true;
-        document.getElementById('notificationsToggle').checked = this.currentUser.settings?.notificationsEnabled ?? true;
+        
+        const notificationsToggle = document.getElementById('notificationsToggle');
+        if (notificationsToggle) {
+            notificationsToggle.checked = this.currentUser.settings?.notificationsEnabled ?? true;
+        }
+        
+        // Make sure form elements are visible and styled
+        profileName.style.visibility = 'visible';
+        profileName.style.opacity = '1';
+        profileEmail.style.visibility = 'visible';
+        profileEmail.style.opacity = '1';
         
         // Update large avatar
         const avatarLarge = document.getElementById('profileAvatarLarge');
         const initialsLarge = document.getElementById('profileInitialsLarge');
         
-        if (this.currentUser.avatar) {
-            avatarLarge.src = this.currentUser.avatar;
-            avatarLarge.style.display = 'block';
-            initialsLarge.style.display = 'none';
-        } else {
-            const userInitials = this.currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase();
-            initialsLarge.textContent = userInitials;
-            avatarLarge.style.display = 'none';
-            initialsLarge.style.display = 'flex';
+        if (avatarLarge && initialsLarge) {
+            if (this.currentUser.avatar) {
+                avatarLarge.src = this.currentUser.avatar;
+                avatarLarge.style.display = 'block';
+                avatarLarge.style.visibility = 'visible';
+                avatarLarge.style.opacity = '1';
+                initialsLarge.style.display = 'none';
+            } else {
+                const userInitials = this.currentUser.name ? 
+                    this.currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase() : 
+                    '??';
+                initialsLarge.textContent = userInitials;
+                avatarLarge.style.display = 'none';
+                initialsLarge.style.display = 'flex';
+                initialsLarge.style.visibility = 'visible';
+                initialsLarge.style.opacity = '1';
+            }
+        }
+        
+        // Make sure the change avatar button is visible
+        const changeAvatarBtn = document.getElementById('changeAvatarBtn');
+        if (changeAvatarBtn) {
+            changeAvatarBtn.style.visibility = 'visible';
+            changeAvatarBtn.style.opacity = '1';
         }
     }
     
