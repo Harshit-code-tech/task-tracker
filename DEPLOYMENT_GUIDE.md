@@ -19,7 +19,7 @@ git add .
 git commit -m "Initial commit - ProductiveFire ready for deployment"
 
 # Push to GitHub
-git remote add origin https://github.com/yourusername/your-repo.git
+git remote add origin https://github.com/Harshit-code-tech/task-tracker
 git push -u origin main
 ```
 

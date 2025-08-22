@@ -62,7 +62,7 @@ A modern, secure task management platform with AI companion, featuring authentic
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Harshit-code-tech/task-tracker
    cd task-tracker
    ```
 
@@ -101,7 +101,7 @@ NODE_ENV=development
 JWT_SECRET=your-secure-jwt-secret-key
 
 # MongoDB Connection
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/productivefire
+MONGODB_URI=(url provided by mongodb)
 
 # Email Configuration (for notifications)
 EMAIL_HOST=smtp.gmail.com
