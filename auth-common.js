@@ -150,11 +150,27 @@ const AuthUtils = {
         }
     },
     
+    // Detect base URL for different environments
+    getBaseURL() {
+        if (typeof window !== 'undefined') {
+            // Browser environment
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                // Local development
+                return 'http://localhost:3001/api';
+            } else {
+                // Production (Vercel or other hosting)
+                return `${window.location.protocol}//${window.location.host}/api`;
+            }
+        }
+        // Fallback for server-side or unknown environment
+        return '/api';
+    },
+    
     // API request helper
     async makeRequest(url, options = {}) {
         try {
             // Add base URL if not already present
-            const fullUrl = url.startsWith('http') ? url : `http://localhost:3001${url}`;
+            const fullUrl = url.startsWith('http') ? url : `${this.getBaseURL()}${url}`;
             
             const response = await fetch(fullUrl, {
                 headers: {
