@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Tracker Pro - NeetCode & More</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Authentication Check Script -->
+    <script>
+        // Immediate authentication check - redirect if not logged in
+        (function() {
+            const token = localStorage.getItem('productivefire_token');
+            const userData = localStorage.getItem('productivefire_user');
+            
+            if (!token || !userData) {
+                // Not authenticated, redirect to home
+                window.location.href = 'home.html';
+                return;
+            }
+        })();
+    </script>
+
+    <!-- Main Application -->
+    <div id="mainApp">
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-check-circle"></i>
+                    <h1>Task Tracker Pro</h1>
+                </div>
+                <div class="user-profile">
+                    <div id="userSignedIn" class="user-info">
+                        <div class="user-avatar">
+                            <img id="userAvatar" src="" alt="User Avatar" style="display: none;">
+                            <div id="userInitials" class="user-initials"></div>
+                        </div>
+                        <div class="user-details">
+                            <span id="userName" class="user-name"></span>
+                            <span id="userStreak" class="user-streak">🔥 0 day streak</span>
+                        </div>
+                        <button id="userMenuBtn" class="user-menu-btn">⚙️</button>
+                    </div>
+                </div>
+                <div class="header-stats">
+                    <div class="stat-card">
+                        <span class="stat-number" id="totalTasks">0</span>
+                        <span class="stat-label">Total Tasks</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="completedTasks">0</span>
+                        <span class="stat-label">Completed</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="neetcodeProgress">0</span>
+                        <span class="stat-label">DSA Progress</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="general">
+                <i class="fas fa-tasks"></i>
+                General Tasks
+            </button>
+            <button class="nav-tab" data-tab="dsa">
+                <i class="fas fa-brain"></i>
+                DSA Problems
+            </button>
+            <button class="nav-tab" data-tab="neetcode">
+                <i class="fas fa-code"></i>
+                NeetCode 150
+            </button>
+            <button class="nav-tab" data-tab="courses">
+                <i class="fas fa-graduation-cap"></i>
+                Learning Hub
+            </button>
+            <button class="nav-tab" data-tab="analytics">
+                <i class="fas fa-chart-line"></i>
+                Analytics
+            </button>
+        </nav>
+
+        <!-- General Tasks Tab -->
+        <div class="tab-content active" id="general">
+            <div class="section-header">
+                <h2>
+                    <i class="fas fa-clipboard-list"></i>
+                    General Tasks
+                </h2>
+                <button class="btn btn-primary" onclick="openTaskModal()">
+                    <i class="fas fa-plus"></i>
+                    Add Task
+                </button>
+            </div>
+
+            <div class="filters">
+                <select id="filterStatus" onchange="filterTasks()">
+                    <option value="all">All Tasks</option>
+                    <option value="pending">Pending</option>
+                    <option value="completed">Completed</option>
+                    <option value="overdue">Overdue</option>
+                </select>
+                <select id="filterPriority" onchange="filterTasks()">
+                    <option value="all">All Priorities</option>
+                    <option value="high">High Priority</option>
+                    <option value="medium">Medium Priority</option>
+                    <option value="low">Low Priority</option>
+                </select>
+            </div>
+
+            <div class="tasks-container" id="generalTasks">
+                <!-- General tasks will be rendered here -->
+            </div>
+        </div>
+
+        <!-- DSA Problems Tab -->
+        <div class="tab-content" id="dsa">
+            <div class="section-header">
+                <h2>
+                    <i class="fas fa-brain"></i>
+                    Data Structures & Algorithms
+                </h2>
+                <div class="dsa-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="dsaProgressBar"></div>
+                    </div>
+                    <span id="dsaProgressText">0/0 (0%)</span>
+                </div>
+            </div>
+
+            <div class="dsa-categories" id="dsaCategories">
+                <!-- DSA categories will be rendered here -->
+            </div>
+        </div>
+
+        <!-- NeetCode 150 Tab -->
+        <div class="tab-content" id="neetcode">
+            <div class="section-header">
+                <h2>
+                    <i class="fas fa-code"></i>
+                    NeetCode 150 Challenge
+                </h2>
+                <div class="neetcode-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="neetcodeProgressBar"></div>
+                    </div>
+                    <span id="neetcodeProgressText">0/150 (0%)</span>
+                </div>
+            </div>
+
+            <div class="neetcode-categories" id="neetcodeCategories">
+                <!-- NeetCode categories will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Learning Hub Tab -->
+        <div class="tab-content" id="courses">
+            <div class="section-header">
+                <h2>
+                    <i class="fas fa-graduation-cap"></i>
+                    Learning Hub
+                </h2>
+                <button class="btn btn-primary" onclick="openCourseModal()">
+                    <i class="fas fa-plus"></i>
+                    Add Course
+                </button>
+            </div>
+
+            <div class="learning-sections">
+                <!-- Algorithms Section -->
+                <div class="learning-card">
+                    <div class="learning-header">
+                        <h3>
+                            <i class="fas fa-cogs"></i>
+                            Algorithms Mastery Path
+                        </h3>
+                        <div class="algorithms-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="algorithmsProgressBar"></div>
+                            </div>
+                            <span id="algorithmsProgressText">0/35 (0%)</span>
+                        </div>
+                    </div>
+                    <div class="algorithms-grid" id="algorithmsGrid">
+                        <!-- Algorithms will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Online Resources Section -->
+                <div class="learning-card">
+                    <div class="learning-header">
+                        <h3>
+                            <i class="fas fa-globe"></i>
+                            Online Learning Resources
+                        </h3>
+                        <div class="resource-stats">
+                            <span id="resourceStats">13 Premium Platforms</span>
+                        </div>
+                    </div>
+                    <div class="resources-grid" id="resourcesGrid">
+                        <!-- Resources will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Personal Courses Section -->
+                <div class="learning-card">
+                    <div class="learning-header">
+                        <h3>
+                            <i class="fas fa-bookmark"></i>
+                            My Learning Courses
+                        </h3>
+                        <div class="course-stats">
+                            <span id="courseStats">Track your progress</span>
+                        </div>
+                    </div>
+                    <div class="courses-grid" id="coursesGrid">
+                        <!-- Personal courses will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div class="tab-content" id="analytics">
+            <div class="section-header">
+                <h2>
+                    <i class="fas fa-chart-line"></i>
+                    Analytics & Progress
+                </h2>
+            </div>
+
+            <div class="analytics-grid">
+                <div class="analytics-card">
+                    <h3>Completion Rate</h3>
+                    <div class="metric-value" id="completionRate">0%</div>
+                    <div class="metric-subtitle">Overall task completion</div>
+                </div>
+                
+                <div class="analytics-card">
+                    <h3>Daily Streak</h3>
+                    <div class="metric-value" id="dailyStreak">0</div>
+                    <div class="metric-subtitle">Consecutive days</div>
+                </div>
+                
+                <div class="analytics-card">
+                    <h3>Upcoming Deadlines</h3>
+                    <div class="metric-value" id="upcomingDeadlines">0</div>
+                    <div class="metric-subtitle">Next 7 days</div>
+                </div>
+                
+                <div class="analytics-card">
+                    <h3>DSA Progress</h3>
+                    <div class="metric-value" id="neetcodeMetric">0%</div>
+                    <div class="metric-subtitle">Course problems</div>
+                </div>
+            </div>
+
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h3>Weekly Progress</h3>
+                    <canvas id="weeklyChart" width="400" height="200"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Category Breakdown</h3>
+                    <div id="categoryBreakdown"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fun Robot Companion -->
+    <div class="robot-companion" id="robotCompanion">
+        <div class="robot-container">
+            <!-- Robot Head -->
+            <div class="robot-head">
+                <div class="robot-antenna left"></div>
+                <div class="robot-antenna right"></div>
+                <div class="robot-face">
+                    <div class="robot-eyes">
+                        <div class="robot-eye left" id="leftEye">
+                            <div class="robot-pupil"></div>
+                        </div>
+                        <div class="robot-eye right" id="rightEye">
+                            <div class="robot-pupil"></div>
+                        </div>
+                    </div>
+                    <div class="robot-mouth" id="robotMouth"></div>
+                </div>
+            </div>
+            
+            <!-- Robot Body -->
+            <div class="robot-body">
+                <div class="robot-chest">
+                    <div class="robot-light" id="robotLight"></div>
+                    <div class="robot-buttons">
+                        <div class="robot-button red"></div>
+                        <div class="robot-button green"></div>
+                        <div class="robot-button blue"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Robot Arms -->
+            <div class="robot-arms">
+                <div class="robot-arm left">
+                    <div class="robot-upper-arm"></div>
+                    <div class="robot-lower-arm"></div>
+                    <div class="robot-hand"></div>
+                </div>
+                <div class="robot-arm right">
+                    <div class="robot-upper-arm"></div>
+                    <div class="robot-lower-arm"></div>
+                    <div class="robot-hand"></div>
+                </div>
+            </div>
+            
+            <!-- Robot Speech Bubble -->
+            <div class="robot-speech" id="robotSpeech">
+                <div class="speech-content" id="speechContent">Hello! 👋</div>
+                <div class="speech-arrow"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Modal -->
+    <div class="modal-overlay" id="taskModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">Add New Task</h3>
+                <button class="modal-close" onclick="closeTaskModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="taskForm">
+                    <div class="form-group">
+                        <label for="taskTitle">Task Title</label>
+                        <input type="text" id="taskTitle" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="taskDescription">Description</label>
+                        <textarea id="taskDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="taskPriority">Priority</label>
+                            <select id="taskPriority">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="taskDeadline">Deadline</label>
+                            <input type="datetime-local" id="taskDeadline">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="taskCategory">Category</label>
+                        <input type="text" id="taskCategory" placeholder="e.g., Work, Study, Personal">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeTaskModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" onclick="saveTask()">Save Task</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Course Modal -->
+    <div class="modal-overlay" id="courseModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="courseModalTitle">Add New Course</h3>
+                <button class="modal-close" onclick="closeCourseModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="courseForm">
+                    <div class="form-group">
+                        <label for="courseName">Course Name</label>
+                        <input type="text" id="courseName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="courseDescription">Description</label>
+                        <textarea id="courseDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="coursePlatform">Platform</label>
+                            <input type="text" id="coursePlatform" placeholder="e.g., Coursera, Udemy">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="courseProgress">Progress (%)</label>
+                            <input type="number" id="courseProgress" min="0" max="100" value="0">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="courseUrl">Course URL</label>
+                            <input type="url" id="courseUrl" placeholder="https://...">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="courseDeadline">Target Completion</label>
+                            <input type="date" id="courseDeadline">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeCourseModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" onclick="saveCourse()">Save Course</button>
+            </div>
+        </div>
+    </div>
+
+    </div> <!-- End mainApp -->
+
+    <!-- Sign In Modal -->
+    <div id="signInModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Welcome Back! 👋</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="signInForm">
+                <div class="form-group">
+                    <label for="signInEmail">Email</label>
+                    <input type="email" id="signInEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="signInPassword">Password</label>
+                    <input type="password" id="signInPassword" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Sign In</button>
+                    <p>Don't have an account? <a href="#" id="switchToSignUp">Sign up here</a></p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sign Up Modal -->
+    <div id="signUpModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Join ProductiveFire! 🚀</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="signUpForm">
+                <div class="form-group">
+                    <label for="signUpName">Full Name</label>
+                    <input type="text" id="signUpName" required>
+                </div>
+                <div class="form-group">
+                    <label for="signUpEmail">Email</label>
+                    <input type="email" id="signUpEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="signUpPassword">Password</label>
+                    <input type="password" id="signUpPassword" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label for="signUpPasswordConfirm">Confirm Password</label>
+                    <input type="password" id="signUpPasswordConfirm" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Create Account</button>
+                    <p>Already have an account? <a href="#" id="switchToSignIn">Sign in here</a></p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- User Menu Modal -->
+    <div id="userMenuModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>User Settings ⚙️</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="user-profile-detailed">
+                <div class="profile-avatar-section">
+                    <div class="profile-avatar-large">
+                        <img id="profileAvatarLarge" src="" alt="Profile Avatar" style="display: none;">
+                        <div id="profileInitialsLarge" class="profile-initials-large"></div>
+                    </div>
+                    <button id="changeAvatarBtn" class="btn-secondary">Change Avatar</button>
+                    <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
+                </div>
+                <div class="profile-info-section">
+                    <form id="profileForm">
+                        <div class="form-group">
+                            <label for="profileName">Name</label>
+                            <input type="text" id="profileName">
+                        </div>
+                        <div class="form-group">
+                            <label for="profileEmail">Email</label>
+                            <input type="email" id="profileEmail">
+                        </div>
+                        <div class="settings-section">
+                            <h3>Settings</h3>
+                            <div class="setting-item">
+                                <label class="switch">
+                                    <input type="checkbox" id="soundToggle" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <span>Robot Sound Effects</span>
+                            </div>
+                            <div class="setting-item">
+                                <label class="switch">
+                                    <input type="checkbox" id="notificationsToggle" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <span>Browser Notifications</span>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">Save Changes</button>
+                            <button type="button" id="signOutBtn" class="btn-danger">Sign Out</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="dsa-data.js"></script>
+    <script src="neetcode-data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

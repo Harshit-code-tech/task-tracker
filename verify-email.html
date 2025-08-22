@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Email - ProductiveFire</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="auth-styles.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="logo-animation">
+                    <i class="fas fa-envelope-open"></i>
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h1>📧 Verify Your Email</h1>
+                <p>We've sent a 6-digit verification code to your email address</p>
+            </div>
+            
+            <div class="form-info">
+                <div class="email-display">
+                    <i class="fas fa-envelope"></i>
+                    <span id="verificationEmail">Loading...</span>
+                </div>
+            </div>
+            
+            <form id="otpForm" class="auth-form">
+                <div class="form-group">
+                    <label for="otp-container">
+                        <i class="fas fa-key"></i>
+                        Enter Verification Code
+                    </label>
+                    <div class="otp-input-container" id="otp-container">
+                        <input type="text" class="otp-input" maxlength="1" data-index="0" required>
+                        <input type="text" class="otp-input" maxlength="1" data-index="1" required>
+                        <input type="text" class="otp-input" maxlength="1" data-index="2" required>
+                        <input type="text" class="otp-input" maxlength="1" data-index="3" required>
+                        <input type="text" class="otp-input" maxlength="1" data-index="4" required>
+                        <input type="text" class="otp-input" maxlength="1" data-index="5" required>
+                    </div>
+                    <span class="error-message" id="otpError"></span>
+                </div>
+                
+                <div class="otp-timer">
+                    <i class="fas fa-clock"></i>
+                    <span>Code expires in: <strong id="otpTimer">10:00</strong></span>
+                </div>
+                
+                <button type="submit" class="btn-primary" id="verifyOtpBtn">
+                    <span class="btn-text">
+                        <i class="fas fa-shield-check"></i>
+                        Verify Email
+                    </span>
+                    <span class="btn-loading" style="display: none;">
+                        <i class="fas fa-spinner fa-spin"></i> Verifying...
+                    </span>
+                </button>
+                
+                <div class="resend-section">
+                    <p>Didn't receive the code?</p>
+                    <button type="button" class="btn-link" id="resendOtp">
+                        <i class="fas fa-redo"></i>
+                        Resend Verification Code
+                    </button>
+                </div>
+                
+                <div class="divider">
+                    <span>or</span>
+                </div>
+                
+                <div class="auth-actions">
+                    <a href="signup.html" class="btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Sign Up
+                    </a>
+                    <a href="login.html" class="btn-link">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Already verified? Sign In
+                    </a>
+                </div>
+            </form>
+        </div>
+        
+        <div class="auth-features">
+            <div class="feature-item">
+                <i class="fas fa-shield-alt"></i>
+                <div>
+                    <h3>Secure Verification</h3>
+                    <p>Email verification ensures account security</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-clock"></i>
+                <div>
+                    <h3>Quick Setup</h3>
+                    <p>Just one step away from your productivity journey</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-rocket"></i>
+                <div>
+                    <h3>Ready to Launch</h3>
+                    <p>Start organizing tasks immediately after verification</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Success/Error Toast -->
+    <div id="toast" class="toast">
+        <div class="toast-content">
+            <i class="toast-icon"></i>
+            <span class="toast-message"></span>
+        </div>
+    </div>
+
+    <script src="auth-common.js"></script>
+    <script src="verify-email.js"></script>
+</body>
+</html>

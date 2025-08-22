@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account - ProductiveFire</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="auth-styles.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="logo-animation">
+                    <i class="fas fa-user-plus"></i>
+                    <i class="fas fa-fire"></i>
+                </div>
+                <h1>🚀 Join ProductiveFire!</h1>
+                <p>Create your account and start your productivity journey</p>
+            </div>
+            
+            <form id="signUpForm" class="auth-form">
+                <div class="form-group">
+                    <label for="fullName">
+                        <i class="fas fa-user"></i>
+                        Full Name
+                    </label>
+                    <input type="text" id="fullName" name="fullName" placeholder="Enter your full name" required>
+                    <span class="error-message" id="fullNameError"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">
+                        <i class="fas fa-envelope"></i>
+                        Email Address
+                    </label>
+                    <input type="email" id="email" name="email" placeholder="Enter your email address" required>
+                    <span class="error-message" id="emailError"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">
+                        <i class="fas fa-lock"></i>
+                        Password
+                    </label>
+                    <div class="password-input">
+                        <input type="password" id="password" name="password" placeholder="Create a strong password" required>
+                        <button type="button" class="toggle-password" id="togglePasswordBtn">
+                            <i class="fas fa-eye" id="toggleIcon1"></i>
+                        </button>
+                    </div>
+                    <div class="password-strength">
+                        <div class="strength-bar">
+                            <div class="strength-fill" id="strengthFill"></div>
+                        </div>
+                        <span class="strength-text" id="strengthText">Password strength</span>
+                    </div>
+                    <span class="error-message" id="passwordError"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirmPassword">
+                        <i class="fas fa-lock"></i>
+                        Confirm Password
+                    </label>
+                    <div class="password-input">
+                        <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm your password" required>
+                        <button type="button" class="toggle-password" id="toggleConfirmPasswordBtn">
+                            <i class="fas fa-eye" id="toggleIcon2"></i>
+                        </button>
+                    </div>
+                    <span class="error-message" id="confirmPasswordError"></span>
+                </div>
+                
+                <button type="submit" class="btn-primary" id="signUpBtn">
+                    <span class="btn-text">Create Account</span>
+                    <span class="btn-loading" style="display: none;">
+                        <i class="fas fa-spinner fa-spin"></i> Creating Account...
+                    </span>
+                </button>
+                
+                <div class="auth-switch">
+                    <p>Already have an account? <a href="login.html">Sign In</a></p>
+                </div>
+            </form>
+        </div>
+        
+        <div class="auth-features">
+            <div class="feature-item">
+                <i class="fas fa-brain"></i>
+                <div>
+                    <h3>Smart Organization</h3>
+                    <p>AI-powered task management and categorization</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-chart-line"></i>
+                <div>
+                    <h3>Progress Tracking</h3>
+                    <p>Detailed analytics and productivity insights</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-code"></i>
+                <div>
+                    <h3>DSA Practice</h3>
+                    <p>Integrated coding problem sets and tracking</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- OTP Verification Modal -->
+    <div id="otpModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📧 Verify Your Email</h2>
+                <p>We've sent a verification code to</p>
+                <strong id="verificationEmail">your email</strong>
+            </div>
+            
+            <form id="otpForm" class="otp-form">
+                <div class="otp-input-container">
+                    <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" autocomplete="off">
+                    <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" autocomplete="off">
+                    <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" autocomplete="off">
+                    <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" autocomplete="off">
+                    <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" autocomplete="off">
+                    <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" autocomplete="off">
+                </div>
+                
+                <div class="otp-timer" id="otpTimer">
+                    Time remaining: <strong>10:00</strong>
+                </div>
+                
+                <span class="error-message" id="otpError"></span>
+                
+                <button type="submit" class="btn-primary" id="verifyOtpBtn">
+                    <span class="btn-text">Verify & Create Account</span>
+                    <span class="btn-loading" style="display: none;">
+                        <i class="fas fa-spinner fa-spin"></i> Verifying...
+                    </span>
+                </button>
+                
+                <button type="button" class="btn-secondary" id="resendOtp">
+                    <i class="fas fa-redo"></i> Resend Code
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Success/Error Toast -->
+    <div id="toast" class="toast">
+        <div class="toast-content">
+            <i class="toast-icon"></i>
+            <span class="toast-message"></span>
+        </div>
+    </div>
+
+    <script src="auth-common.js"></script>
+    <script src="signup.js"></script>
+</body>
+</html>
