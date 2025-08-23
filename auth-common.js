@@ -180,10 +180,24 @@ const AuthUtils = {
                 ...options
             });
             
-            const data = await response.json();
+            // Handle rate limiting (429) with proper error message
+            if (response.status === 429) {
+                throw new Error('Too many requests. Please wait a few minutes before trying again.');
+            }
+            
+            let data;
+            try {
+                data = await response.json();
+            } catch (parseError) {
+                // If JSON parsing fails, handle non-JSON responses (like rate limit plain text)
+                if (response.status === 429) {
+                    throw new Error('Too many requests. Please wait a few minutes before trying again.');
+                }
+                throw new Error(`Server error: ${response.status} ${response.statusText}`);
+            }
             
             if (!response.ok) {
-                throw new Error(data.message || data.error || 'Request failed');
+                throw new Error(data.message || data.error || `Request failed with status ${response.status}`);
             }
             
             return data;

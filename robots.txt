@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Allow: /home.html
+Allow: /login.html
+Allow: /signup.html
+Disallow: /api/
+Disallow: /backend/
+Disallow: /*.log
+
+Sitemap: https://task-tracker-omega-orcin.vercel.app/sitemap.xml

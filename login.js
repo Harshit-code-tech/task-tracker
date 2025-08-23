@@ -114,6 +114,18 @@ class LoginManager {
             // Show specific error messages
             if (error.message.includes('Invalid credentials')) {
                 AuthUtils.showError('passwordError', 'Invalid email or password');
+            } else if (error.message.includes('Too many requests')) {
+                toast.show('error', 'Too many login attempts. Please wait 15 minutes before trying again.');
+                // Disable the button temporarily
+                const loginBtn = document.getElementById('loginBtn');
+                if (loginBtn) {
+                    loginBtn.disabled = true;
+                    loginBtn.textContent = 'Please wait...';
+                    setTimeout(() => {
+                        loginBtn.disabled = false;
+                        loginBtn.textContent = 'Sign In';
+                    }, 60000); // Re-enable after 1 minute
+                }
             } else if (error.message.includes('email')) {
                 AuthUtils.showError('emailError', error.message);
             } else {

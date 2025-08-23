@@ -144,6 +144,18 @@ class EmailVerificationManager {
             if (error.message.includes('Invalid or expired')) {
                 AuthUtils.showError('otpError', 'Invalid or expired verification code');
                 this.clearOtpInputs();
+            } else if (error.message.includes('Too many requests')) {
+                AuthUtils.showError('otpError', 'Too many attempts. Please wait 15 minutes before trying again.');
+                // Disable the button temporarily
+                const verifyBtn = document.getElementById('verifyBtn');
+                if (verifyBtn) {
+                    verifyBtn.disabled = true;
+                    verifyBtn.textContent = 'Please wait...';
+                    setTimeout(() => {
+                        verifyBtn.disabled = false;
+                        verifyBtn.textContent = 'Verify Email';
+                    }, 60000); // Re-enable after 1 minute
+                }
             } else if (error.message.includes('User already exists')) {
                 toast.show('error', 'Account already exists. Redirecting to login...');
                 setTimeout(() => {

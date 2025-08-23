@@ -1,0 +1,6 @@
+Contact: mailto:security@example.com
+Expires: 2026-12-31T23:59:59.000Z
+Acknowledgments: https://task-tracker-omega-orcin.vercel.app/security
+Preferred-Languages: en
+Canonical: https://task-tracker-omega-orcin.vercel.app/.well-known/security.txt
+Policy: https://task-tracker-omega-orcin.vercel.app/security-policy
