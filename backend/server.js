@@ -186,13 +186,28 @@ app.use((req, res, next) => {
 const connectDB = async () => {
     try {
         if (process.env.MONGODB_URI) {
+            writeLog('INFO', 'Attempting MongoDB connection...', { 
+                hasUri: !!process.env.MONGODB_URI,
+                environment: process.env.NODE_ENV,
+                isVercel: process.env.VERCEL
+            });
             await mongoose.connect(process.env.MONGODB_URI);
-            writeLog('INFO', 'Connected to MongoDB', { database: mongoose.connection.db.databaseName });
+            writeLog('INFO', 'Connected to MongoDB', { 
+                database: mongoose.connection.db.databaseName,
+                readyState: mongoose.connection.readyState 
+            });
         } else {
-            writeLog('WARN', 'No MongoDB URI found, using in-memory storage');
+            writeLog('WARN', 'No MongoDB URI found, using in-memory storage', {
+                environment: process.env.NODE_ENV,
+                isVercel: process.env.VERCEL
+            });
         }
     } catch (error) {
-        writeLog('ERROR', 'MongoDB connection error', { error: error.message });
+        writeLog('ERROR', 'MongoDB connection error', { 
+            error: error.message,
+            code: error.code,
+            environment: process.env.NODE_ENV
+        });
         writeLog('WARN', 'Falling back to in-memory storage');
     }
 };
@@ -269,7 +284,20 @@ const Progress = mongoose.model('Progress', ProgressSchema);
 
 // Helper function to check if MongoDB is available
 const isMongoConnected = () => {
-    return mongoose.connection.readyState === 1 && process.env.MONGODB_URI;
+    const connected = mongoose.connection.readyState === 1 && process.env.MONGODB_URI;
+    if (!connected) {
+        writeLog('DEBUG', 'MongoDB connection check', {
+            readyState: mongoose.connection.readyState,
+            hasUri: !!process.env.MONGODB_URI,
+            states: {
+                0: 'disconnected',
+                1: 'connected', 
+                2: 'connecting',
+                3: 'disconnecting'
+            }[mongoose.connection.readyState]
+        });
+    }
+    return connected;
 };
 
 // Email utility functions
@@ -938,7 +966,13 @@ app.post('/api/auth/verify-signup', authLimiter, [
                 otpAge: Math.round((now - otpDoc.createdAt) / 1000) // seconds
             });
         } else {
-            // For in-memory storage, we'll skip OTP verification in development
+            // If MongoDB is not connected but we're in production, still require OTP verification
+            if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
+                return res.status(400).json({ 
+                    error: 'Database connection required for OTP verification in production' 
+                });
+            }
+            // For local development only, skip OTP verification
             writeLog('WARN', 'Skipping OTP verification in development mode', { email });
         }
 

@@ -40,7 +40,11 @@
 .fa-spinner:before { content: "⏳"; }
 .fa-check:before { content: "✓"; color: #28a745; }
 .fa-exclamation-triangle:before { content: "⚠️"; }
+.fa-exclamation-circle:before { content: "⚠️"; }
 .fa-info-circle:before { content: "ℹ️"; }
+.fa-rocket:before { content: "🚀"; }
+.fa-sign-in-alt:before { content: "🔑"; }
+.fa-robot:before { content: "🤖"; }
 
 /* Special styling for logo */
 .neon-glow {

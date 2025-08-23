@@ -1990,32 +1990,48 @@ function updateStats() {
 }
 
 function updateAnalytics() {
-    const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(t => t.completed).length;
-    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-    
-    const upcomingDeadlines = tasks.filter(t => {
-        if (!t.deadline || t.completed) return false;
-        const deadline = new Date(t.deadline);
-        const now = new Date();
-        const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        return deadline >= now && deadline <= sevenDaysFromNow;
-    }).length;
-    
-    // Calculate combined progress (DSA + NeetCode + Algorithms)
-    const totalDSAProblems = Object.values(dsaProblems).flat().length;
-    const completedDSA = Object.keys(dsaProgress).length;
-    const dsaPercentage = Math.round((completedDSA / totalDSAProblems) * 100);
-    
-    // Calculate daily streak
-    const streak = calculateDailyStreak();
-    
-    document.getElementById('completionRate').textContent = `${completionRate}%`;
-    document.getElementById('dailyStreak').textContent = streak;
-    document.getElementById('upcomingDeadlines').textContent = upcomingDeadlines;
-    document.getElementById('neetcodeMetric').textContent = `${dsaPercentage}%`;
-    
-    renderCategoryBreakdown();
+    try {
+        console.log('📊 Updating analytics...');
+        
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter(t => t.completed).length;
+        const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+        
+        const upcomingDeadlines = tasks.filter(t => {
+            if (!t.deadline || t.completed) return false;
+            const deadline = new Date(t.deadline);
+            const now = new Date();
+            const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+            return deadline >= now && deadline <= sevenDaysFromNow;
+        }).length;
+        
+        // Calculate combined progress (DSA + NeetCode + Algorithms)
+        const totalDSAProblems = Object.values(dsaProblems).flat().length;
+        const completedDSA = Object.keys(dsaProgress).length;
+        const dsaPercentage = Math.round((completedDSA / totalDSAProblems) * 100);
+        
+        // Calculate daily streak
+        const streak = calculateDailyStreak();
+        
+        console.log('📊 Analytics data:', { completionRate, streak, upcomingDeadlines, dsaPercentage });
+        
+        // Update DOM elements with error checking
+        const completionRateEl = document.getElementById('completionRate');
+        const dailyStreakEl = document.getElementById('dailyStreak');
+        const upcomingDeadlinesEl = document.getElementById('upcomingDeadlines');
+        const neetcodeMetricEl = document.getElementById('neetcodeMetric');
+        
+        if (completionRateEl) completionRateEl.textContent = `${completionRate}%`;
+        if (dailyStreakEl) dailyStreakEl.textContent = streak;
+        if (upcomingDeadlinesEl) upcomingDeadlinesEl.textContent = upcomingDeadlines;
+        if (neetcodeMetricEl) neetcodeMetricEl.textContent = `${dsaPercentage}%`;
+        
+        renderCategoryBreakdown();
+        
+        console.log('✅ Analytics updated successfully');
+    } catch (error) {
+        console.error('❌ Error updating analytics:', error);
+    }
 }
 
 function calculateDailyStreak() {
