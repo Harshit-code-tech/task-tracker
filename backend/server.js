@@ -207,14 +207,21 @@ const connectDB = async () => {
                 uriLength: process.env.MONGODB_URI.length
             });
             
-            // Add connection timeout and retry logic
-            await mongoose.connect(process.env.MONGODB_URI, {
-                serverSelectionTimeoutMS: 10000, // 10 seconds
-                socketTimeoutMS: 45000, // 45 seconds
-                maxPoolSize: 10,
+            // Optimized connection settings for serverless environments
+            const connectionOptions = {
+                serverSelectionTimeoutMS: 5000, // 5 seconds (reduced for faster failure detection)
+                socketTimeoutMS: 30000, // 30 seconds
+                connectTimeoutMS: 10000, // 10 seconds
+                maxPoolSize: 1, // Reduced for serverless
+                minPoolSize: 0,
+                maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
                 bufferCommands: false,
-                retryWrites: true
-            });
+                retryWrites: true,
+                retryReads: true,
+                heartbeatFrequencyMS: 10000 // Check connection every 10 seconds
+            };
+            
+            await mongoose.connect(process.env.MONGODB_URI, connectionOptions);
             
             writeLog('INFO', 'Successfully connected to MongoDB', { 
                 database: mongoose.connection.db.databaseName,
@@ -239,18 +246,63 @@ const connectDB = async () => {
             mongoUriExists: !!process.env.MONGODB_URI
         });
         
-        // Don't fall back to in-memory storage in production
-        if (process.env.NODE_ENV === 'production') {
-            writeLog('FATAL', 'MongoDB connection required in production - not starting server');
-            throw error;
+        // In production/serverless, throw the error immediately
+        if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
+            writeLog('FATAL', 'MongoDB connection required in production - server will not start properly');
+            // Don't throw error in serverless - let the function continue and handle gracefully
+            // The isMongoConnected() checks will handle individual request failures
         } else {
             writeLog('WARN', 'Falling back to in-memory storage for development');
         }
     }
 };
 
-// Connect to MongoDB
-connectDB();
+// Connection event handlers for better monitoring
+mongoose.connection.on('connected', () => {
+    writeLog('INFO', 'MongoDB connected successfully');
+});
+
+mongoose.connection.on('error', (err) => {
+    writeLog('ERROR', 'MongoDB connection error', { error: err.message });
+});
+
+mongoose.connection.on('disconnected', () => {
+    writeLog('WARN', 'MongoDB disconnected');
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+    try {
+        await mongoose.connection.close();
+        writeLog('INFO', 'MongoDB connection closed through app termination');
+        process.exit(0);
+    } catch (error) {
+        writeLog('ERROR', 'Error during graceful shutdown', { error: error.message });
+        process.exit(1);
+    }
+});
+
+// Connect to MongoDB with retry logic
+const initializeDatabase = async () => {
+    let retries = 3;
+    while (retries > 0) {
+        try {
+            await connectDB();
+            break;
+        } catch (error) {
+            retries--;
+            if (retries === 0) {
+                writeLog('FATAL', 'Failed to connect to MongoDB after all retries', { error: error.message });
+            } else {
+                writeLog('WARN', `MongoDB connection failed, retrying... (${retries} attempts left)`, { error: error.message });
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+            }
+        }
+    }
+};
+
+// Initialize database connection
+initializeDatabase();
 
 // Email configuration
 const createEmailTransporter = () => {
@@ -335,6 +387,24 @@ const isMongoConnected = () => {
         });
     }
     return connected;
+};
+
+// Database connectivity middleware for critical endpoints
+const requireDatabaseConnection = (req, res, next) => {
+    if (!isMongoConnected()) {
+        writeLog('ERROR', 'Database required but not connected', {
+            endpoint: req.path,
+            method: req.method,
+            mongoState: mongoose.connection.readyState,
+            hasUri: !!process.env.MONGODB_URI
+        });
+        
+        return res.status(503).json({ 
+            error: 'Database connection failed. Please try again in a moment.',
+            retryAfter: 5 // Suggest client retry after 5 seconds
+        });
+    }
+    next();
 };
 
 // Email utility functions
@@ -913,7 +983,7 @@ app.post('/api/auth/send-signup-otp', authLimiter, [
 });
 
 // Verify OTP and complete signup
-app.post('/api/auth/verify-signup', authLimiter, [
+app.post('/api/auth/verify-signup', requireDatabaseConnection, authLimiter, [
     body('email').isEmail().normalizeEmail(),
     body('otp').isLength({ min: 6, max: 6 }).isNumeric(),
     body('name').trim().isLength({ min: 2 }).escape(),
@@ -936,15 +1006,16 @@ app.post('/api/auth/verify-signup', authLimiter, [
 
         // Verify OTP
         let otpDoc;
-        if (isMongoConnected()) {
-            writeLog('DEBUG', 'MongoDB is connected, proceeding with OTP verification', {
-                email,
-                mongoState: mongoose.connection.readyState,
-                mongoHost: mongoose.connection.host
-            });
-            
-            // First, clean up expired OTPs
-            const now = new Date();
+        
+        writeLog('DEBUG', 'Starting OTP verification', {
+            email,
+            mongoState: mongoose.connection.readyState,
+            mongoHost: mongoose.connection.host
+        });
+        
+        // First, clean up expired OTPs
+        const now = new Date();
+        try {
             const expiredCount = await Otp.deleteMany({ 
                 email, 
                 type: 'signup',
@@ -954,8 +1025,12 @@ app.post('/api/auth/verify-signup', authLimiter, [
             if (expiredCount.deletedCount > 0) {
                 writeLog('INFO', 'Cleaned up expired OTPs', { email, count: expiredCount.deletedCount });
             }
-            
-            // Find valid OTP with more flexible matching
+        } catch (cleanupError) {
+            writeLog('WARN', 'Failed to cleanup expired OTPs', { error: cleanupError.message });
+        }
+        
+        // Find valid OTP with more flexible matching
+        try {
             const otpQuery = { 
                 email, 
                 type: 'signup',
@@ -1008,28 +1083,15 @@ app.post('/api/auth/verify-signup', authLimiter, [
                 otpId: otpDoc._id,
                 otpAge: Math.round((now - otpDoc.createdAt) / 1000) // seconds
             });
-        } else {
-            // MongoDB is not connected - provide detailed error information
-            const errorDetails = {
-                mongoState: mongoose.connection.readyState,
-                hasMongoUri: !!process.env.MONGODB_URI,
-                environment: process.env.NODE_ENV,
-                isVercel: process.env.VERCEL,
-                connectionHost: mongoose.connection.host || 'none',
-                connectionName: mongoose.connection.name || 'none'
-            };
-            
-            writeLog('ERROR', 'MongoDB not connected during OTP verification', errorDetails);
-            
-            if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
-                return res.status(500).json({ 
-                    error: 'Database connection failed. Please try again in a moment.',
-                    details: 'MongoDB connection is required for OTP verification',
-                    debug: errorDetails
-                });
-            }
-            // For local development only, skip OTP verification
-            writeLog('WARN', 'Skipping OTP verification in development mode', { email });
+        } catch (otpError) {
+            writeLog('ERROR', 'Database error during OTP verification', { 
+                error: otpError.message,
+                code: otpError.code,
+                email 
+            });
+            return res.status(500).json({ 
+                error: 'Database connection failed during verification. Please try again in a moment.' 
+            });
         }
 
         // Hash password
@@ -1053,7 +1115,7 @@ app.post('/api/auth/verify-signup', authLimiter, [
         };
 
         let user;
-        if (isMongoConnected()) {
+        try {
             // Save to MongoDB
             user = new User(userData);
             await user.save();
@@ -1070,21 +1132,32 @@ app.post('/api/auth/verify-signup', authLimiter, [
             
             // Delete used OTP
             await Otp.deleteOne({ _id: otpDoc._id });
-        } else {
-            // In-memory storage
-            user = { id: Date.now().toString(), ...userData };
-            users[email] = user;
-            userTasks[user.id] = [];
-            userProgress[user.id] = {
-                totalTasks: 0,
-                completedTasks: 0,
-                dsaProblems: 0,
-                streak: 1
-            };
+            
+            writeLog('INFO', 'User created successfully', { 
+                userId: user._id.toString(), 
+                email: user.email 
+            });
+        } catch (dbError) {
+            writeLog('ERROR', 'Database error during user creation', { 
+                error: dbError.message,
+                code: dbError.code,
+                email 
+            });
+            
+            // Handle duplicate user error
+            if (dbError.code === 11000) {
+                return res.status(400).json({ 
+                    error: 'An account with this email already exists' 
+                });
+            }
+            
+            return res.status(500).json({ 
+                error: 'Database error during account creation. Please try again.' 
+            });
         }
 
         // Generate JWT token
-        const userId = isMongoConnected() ? user._id.toString() : user.id;
+        const userId = user._id.toString();
         const token = jwt.sign(
             { userId, email },
             JWT_SECRET,
@@ -1092,7 +1165,7 @@ app.post('/api/auth/verify-signup', authLimiter, [
         );
 
         // Return user data (excluding password)
-        const { password: _, ...userWithoutPassword } = user.toObject ? user.toObject() : user;
+        const { password: _, ...userWithoutPassword } = user.toObject();
         userWithoutPassword.id = userId;
         delete userWithoutPassword._id;
         delete userWithoutPassword.__v;
