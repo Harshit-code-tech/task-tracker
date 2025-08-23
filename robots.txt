@@ -3,8 +3,16 @@ Allow: /
 Allow: /home.html
 Allow: /login.html
 Allow: /signup.html
+Allow: /privacy
+Allow: /terms
+Allow: /security
 Disallow: /api/
 Disallow: /backend/
 Disallow: /*.log
+Disallow: /verify-email.html
+Disallow: /forgot-password.html
+
+# Security
+Crawl-delay: 1
 
 Sitemap: https://task-tracker-omega-orcin.vercel.app/sitemap.xml

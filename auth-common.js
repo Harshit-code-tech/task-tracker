@@ -266,7 +266,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Send auth check to server log
-    fetch('/api/auth/log-check', {
+    const apiBaseUrl = window.location.origin; // Use current domain for API calls
+    fetch(`${apiBaseUrl}/api/auth/log-check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,6 +1,7 @@
 {
   "version": 2,
-  "name": "productivefire-task-tracker",
+  "name": "task-tracker",
+  "alias": ["task-tracker-omega-orcin.vercel.app"],
   "builds": [
     {
       "src": "backend/server.js",
