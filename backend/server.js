@@ -58,14 +58,20 @@ if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+            defaultSrc: ["'self'", "https:"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdnjs.cloudflare.com"],
             scriptSrcAttr: ["'self'", "'unsafe-inline'"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
             imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'"]
+            connectSrc: ["'self'", "https://task-tracker-omega-orcin.vercel.app"]
         }
+    },
+    crossOriginEmbedderPolicy: false,
+    hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
     }
 }));
 app.use(cors({
@@ -74,9 +80,13 @@ app.use(cors({
         'http://localhost:8080',
         'http://127.0.0.1:8080',
         'http://localhost:5500',
-        'http://127.0.0.1:5500'
+        'http://127.0.0.1:5500',
+        'https://task-tracker-omega-orcin.vercel.app',
+        'https://*.vercel.app'
     ],
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Serve static files from the parent directory (frontend)
@@ -107,8 +117,20 @@ app.use(limiter);
 // Auth rate limiting
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // limit each IP to 5 auth requests per windowMs
-    message: 'Too many authentication attempts, please try again later.'
+    max: 20, // Increased from 5 to 20 requests per windowMs
+    message: { error: 'Too many authentication attempts, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Skip rate limiting for development
+    skip: (req) => {
+        return process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1';
+    },
+    keyGenerator: (req) => {
+        if (app.get('trust proxy')) {
+            return req.ip;
+        }
+        return req.connection?.remoteAddress || req.socket?.remoteAddress || req.ip || 'localhost';
+    }
 });
 
 app.use(express.json({ limit: '10mb' }));
@@ -743,6 +765,12 @@ app.post('/api/auth/send-signup-otp', authLimiter, [
         const otp = generateOtp();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+        writeLog('INFO', 'Generating OTP for signup', { 
+            email, 
+            otpLength: otp.length, 
+            expiresAt: expiresAt.toISOString() 
+        });
+
         // Save OTP
         if (isMongoConnected()) {
             // Remove any existing OTPs for this email
@@ -755,6 +783,7 @@ app.post('/api/auth/send-signup-otp', authLimiter, [
                 expiresAt
             });
             await otpDoc.save();
+            writeLog('INFO', 'OTP saved to database', { email, otpId: otpDoc._id });
         }
 
         // Send email
@@ -795,22 +824,56 @@ app.post('/api/auth/verify-signup', authLimiter, [
 
         const { email, otp, name, password } = req.body;
 
+        writeLog('INFO', 'OTP verification attempt', { 
+            email, 
+            otpProvided: otp,
+            nameLength: name?.length,
+            passwordLength: password?.length 
+        });
+
         // Verify OTP
         let otpDoc;
         if (isMongoConnected()) {
+            // First, clean up expired OTPs
+            const expiredCount = await Otp.deleteMany({ 
+                email, 
+                type: 'signup',
+                expiresAt: { $lt: new Date() }
+            });
+            
+            if (expiredCount.deletedCount > 0) {
+                writeLog('INFO', 'Cleaned up expired OTPs', { email, count: expiredCount.deletedCount });
+            }
+            
+            // Find valid OTP
             otpDoc = await Otp.findOne({ 
                 email, 
-                otp, 
+                otp: otp.toString(), // Ensure string comparison
                 type: 'signup',
                 expiresAt: { $gt: new Date() }
             });
             
             if (!otpDoc) {
+                // Check if any OTP exists for debugging
+                const anyOtp = await Otp.findOne({ email, type: 'signup' });
+                if (anyOtp) {
+                    writeLog('WARN', 'OTP mismatch', { 
+                        email,
+                        provided: otp, 
+                        stored: anyOtp.otp, 
+                        expired: anyOtp.expiresAt < new Date(),
+                        timeDiff: new Date() - anyOtp.expiresAt
+                    });
+                } else {
+                    writeLog('WARN', 'No OTP found for email', { email });
+                }
                 return res.status(400).json({ error: 'Invalid or expired verification code' });
             }
+            
+            writeLog('INFO', 'OTP verification successful', { email, otpId: otpDoc._id });
         } else {
             // For in-memory storage, we'll skip OTP verification in development
-            console.log('⚠️ Skipping OTP verification in development mode');
+            writeLog('WARN', 'Skipping OTP verification in development mode', { email });
         }
 
         // Hash password
