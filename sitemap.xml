@@ -25,15 +25,21 @@
         <priority>0.7</priority>
     </url>
     <url>
-        <loc>https://task-tracker-omega-orcin.vercel.app/privacy.html</loc>
+        <loc>https://task-tracker-omega-orcin.vercel.app/privacy</loc>
         <lastmod>2025-08-23</lastmod>
         <changefreq>yearly</changefreq>
         <priority>0.3</priority>
     </url>
     <url>
-        <loc>https://task-tracker-omega-orcin.vercel.app/terms.html</loc>
+        <loc>https://task-tracker-omega-orcin.vercel.app/terms</loc>
         <lastmod>2025-08-23</lastmod>
         <changefreq>yearly</changefreq>
         <priority>0.3</priority>
+    </url>
+    <url>
+        <loc>https://task-tracker-omega-orcin.vercel.app/security</loc>
+        <lastmod>2025-08-23</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
     </url>
 </urlset>

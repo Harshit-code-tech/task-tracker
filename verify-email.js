@@ -59,36 +59,95 @@ class EmailVerificationManager {
     
     setupOtpInputs() {
         this.otpInputs.forEach((input, index) => {
+            // Set input type to text to avoid number input issues
+            input.type = 'text';
+            input.inputMode = 'numeric';
+            input.pattern = '[0-9]*';
+            
             input.addEventListener('input', (e) => {
-                const value = e.target.value;
+                let value = e.target.value;
                 
-                // Only allow numbers
-                if (!/^\d$/.test(value) && value !== '') {
-                    e.target.value = '';
-                    return;
+                // Remove any non-numeric characters
+                value = value.replace(/\D/g, '');
+                
+                // Take only the first digit if multiple entered
+                if (value.length > 1) {
+                    value = value.charAt(0);
                 }
                 
-                // Move to next input
+                e.target.value = value;
+                
+                // Move to next input if value entered and not last input
                 if (value && index < this.otpInputs.length - 1) {
                     this.otpInputs[index + 1].focus();
                 }
                 
+                // Clear any previous errors
                 AuthUtils.clearError('otpError');
             });
             
             input.addEventListener('keydown', (e) => {
-                // Move to previous input on backspace
-                if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                // Move to previous input on backspace if current is empty
+                if (e.key === 'Backspace') {
+                    if (!e.target.value && index > 0) {
+                        this.otpInputs[index - 1].focus();
+                        // Also clear the previous input
+                        this.otpInputs[index - 1].value = '';
+                    }
+                }
+                
+                // Handle arrow keys for navigation
+                if (e.key === 'ArrowLeft' && index > 0) {
                     this.otpInputs[index - 1].focus();
+                }
+                if (e.key === 'ArrowRight' && index < this.otpInputs.length - 1) {
+                    this.otpInputs[index + 1].focus();
+                }
+                
+                // Prevent non-numeric input except backspace, delete, tab, and arrow keys
+                if (!/[\d]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    e.preventDefault();
+                }
+            });
+            
+            // Handle paste events
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pastedData = e.clipboardData.getData('text').replace(/\D/g, '');
+                
+                if (pastedData) {
+                    // Fill inputs with pasted digits
+                    for (let i = 0; i < Math.min(pastedData.length, this.otpInputs.length - index); i++) {
+                        if (index + i < this.otpInputs.length) {
+                            this.otpInputs[index + i].value = pastedData.charAt(i);
+                        }
+                    }
+                    
+                    // Focus the next empty input or last input
+                    const nextEmptyIndex = Math.min(index + pastedData.length, this.otpInputs.length - 1);
+                    this.otpInputs[nextEmptyIndex].focus();
                 }
             });
             
             // Clear error on focus
-            input.addEventListener('focus', () => AuthUtils.clearError('otpError'));
+            input.addEventListener('focus', () => {
+                AuthUtils.clearError('otpError');
+                // Select all text for easier replacement
+                input.select();
+            });
+            
+            // Ensure proper display
+            input.addEventListener('blur', () => {
+                // Re-validate the input value
+                const value = input.value.replace(/\D/g, '');
+                input.value = value;
+            });
         });
         
-        // Focus first input
-        this.otpInputs[0].focus();
+        // Focus first input initially
+        if (this.otpInputs[0]) {
+            this.otpInputs[0].focus();
+        }
     }
     
     async handleVerificationSubmit(e) {

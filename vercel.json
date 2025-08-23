@@ -30,11 +30,35 @@
     },
     {
       "src": "/.well-known/security.txt",
-      "dest": "/.well-known/security.txt"
+      "dest": "/.well-known/security.txt",
+      "headers": {
+        "Content-Type": "text/plain",
+        "Cache-Control": "public, max-age=86400"
+      }
     },
     {
       "src": "/robots.txt",
-      "dest": "/robots.txt"
+      "dest": "/robots.txt",
+      "headers": {
+        "Content-Type": "text/plain",
+        "Cache-Control": "public, max-age=86400"
+      }
+    },
+    {
+      "src": "/sitemap.xml",
+      "dest": "/sitemap.xml",
+      "headers": {
+        "Content-Type": "application/xml",
+        "Cache-Control": "public, max-age=86400"
+      }
+    },
+    {
+      "src": "/security",
+      "dest": "/api/security"
+    },
+    {
+      "src": "/security-policy",
+      "dest": "/api/security-policy"
     },
     {
       "src": "/privacy",

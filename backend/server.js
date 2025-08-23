@@ -58,21 +58,57 @@ if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
-            defaultSrc: ["'self'", "https:"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdnjs.cloudflare.com"],
+            defaultSrc: ["'self'"],
+            scriptSrc: [
+                "'self'", 
+                "'unsafe-inline'", 
+                "'unsafe-eval'", 
+                "https://cdnjs.cloudflare.com",
+                "https://cdn.jsdelivr.net"
+            ],
             scriptSrcAttr: ["'self'", "'unsafe-inline'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
-            fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
-            imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "https://task-tracker-omega-orcin.vercel.app"]
+            styleSrc: [
+                "'self'", 
+                "'unsafe-inline'", 
+                "https://cdnjs.cloudflare.com", 
+                "https://fonts.googleapis.com",
+                "https://cdn.jsdelivr.net"
+            ],
+            fontSrc: [
+                "'self'", 
+                "https://fonts.gstatic.com", 
+                "https://cdnjs.cloudflare.com",
+                "data:"
+            ],
+            imgSrc: ["'self'", "data:", "https:", "blob:"],
+            connectSrc: [
+                "'self'", 
+                "https://task-tracker-omega-orcin.vercel.app",
+                "https://*.vercel.app"
+            ],
+            frameSrc: ["'none'"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"]
         }
     },
     crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    dnsPrefetchControl: { allow: false },
+    frameguard: { action: 'deny' },
+    hidePoweredBy: true,
     hsts: {
         maxAge: 31536000,
         includeSubDomains: true,
         preload: true
-    }
+    },
+    ieNoOpen: true,
+    noSniff: true,
+    originAgentCluster: true,
+    permittedCrossDomainPolicies: false,
+    referrerPolicy: { policy: "no-referrer" },
+    xssFilter: true
 }));
 app.use(cors({
     origin: [
@@ -232,7 +268,9 @@ const Task = mongoose.model('Task', TaskSchema);
 const Progress = mongoose.model('Progress', ProgressSchema);
 
 // Helper function to check if MongoDB is available
-const isMongoConnected = () => mongoose.connection.readyState === 1;
+const isMongoConnected = () => {
+    return mongoose.connection.readyState === 1 && process.env.MONGODB_URI;
+};
 
 // Email utility functions
 const generateOtp = () => {
@@ -835,42 +873,70 @@ app.post('/api/auth/verify-signup', authLimiter, [
         let otpDoc;
         if (isMongoConnected()) {
             // First, clean up expired OTPs
+            const now = new Date();
             const expiredCount = await Otp.deleteMany({ 
                 email, 
                 type: 'signup',
-                expiresAt: { $lt: new Date() }
+                expiresAt: { $lt: now }
             });
             
             if (expiredCount.deletedCount > 0) {
                 writeLog('INFO', 'Cleaned up expired OTPs', { email, count: expiredCount.deletedCount });
             }
             
-            // Find valid OTP
-            otpDoc = await Otp.findOne({ 
+            // Find valid OTP with more flexible matching
+            const otpQuery = { 
                 email, 
-                otp: otp.toString(), // Ensure string comparison
                 type: 'signup',
-                expiresAt: { $gt: new Date() }
+                expiresAt: { $gt: now }
+            };
+            
+            // Try exact match first
+            otpDoc = await Otp.findOne({ 
+                ...otpQuery, 
+                otp: otp.toString().trim()
             });
             
+            // If no exact match, try case-insensitive comparison
             if (!otpDoc) {
-                // Check if any OTP exists for debugging
+                const allOtps = await Otp.find(otpQuery);
+                otpDoc = allOtps.find(doc => 
+                    doc.otp.toString().trim().toLowerCase() === otp.toString().trim().toLowerCase()
+                );
+            }
+            
+            if (!otpDoc) {
+                // Enhanced debugging for OTP verification failures
                 const anyOtp = await Otp.findOne({ email, type: 'signup' });
+                const debugInfo = {
+                    email,
+                    provided: otp.toString().trim(),
+                    providedLength: otp.toString().trim().length
+                };
+                
                 if (anyOtp) {
-                    writeLog('WARN', 'OTP mismatch', { 
-                        email,
-                        provided: otp, 
-                        stored: anyOtp.otp, 
-                        expired: anyOtp.expiresAt < new Date(),
-                        timeDiff: new Date() - anyOtp.expiresAt
-                    });
+                    debugInfo.stored = anyOtp.otp;
+                    debugInfo.storedLength = anyOtp.otp.length;
+                    debugInfo.expired = anyOtp.expiresAt < now;
+                    debugInfo.timeDiff = Math.round((now - anyOtp.expiresAt) / 1000); // seconds
+                    debugInfo.createdAt = anyOtp.createdAt;
+                    debugInfo.expiresAt = anyOtp.expiresAt;
+                    debugInfo.exactMatch = anyOtp.otp === otp.toString().trim();
+                    debugInfo.caseInsensitiveMatch = anyOtp.otp.toLowerCase() === otp.toString().trim().toLowerCase();
+                    
+                    writeLog('WARN', 'OTP verification failed - details', debugInfo);
                 } else {
-                    writeLog('WARN', 'No OTP found for email', { email });
+                    writeLog('WARN', 'No OTP found for email', debugInfo);
                 }
+                
                 return res.status(400).json({ error: 'Invalid or expired verification code' });
             }
             
-            writeLog('INFO', 'OTP verification successful', { email, otpId: otpDoc._id });
+            writeLog('INFO', 'OTP verification successful', { 
+                email, 
+                otpId: otpDoc._id,
+                otpAge: Math.round((now - otpDoc.createdAt) / 1000) // seconds
+            });
         } else {
             // For in-memory storage, we'll skip OTP verification in development
             writeLog('WARN', 'Skipping OTP verification in development mode', { email });
@@ -1131,6 +1197,67 @@ app.post('/api/auth/reset-password', authLimiter, [
         console.error('Reset password error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
+});
+
+// Security routes
+app.get('/security', (req, res) => {
+    res.setHeader('Content-Type', 'text/html');
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Security - ProductiveFire</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body>
+            <h1>Security Information</h1>
+            <p>ProductiveFire is committed to security and protecting user data.</p>
+            <p>If you discover any security vulnerabilities, please report them to security@productivefire.com</p>
+            <p>We follow industry best practices including:</p>
+            <ul>
+                <li>HTTPS encryption</li>
+                <li>Content Security Policy</li>
+                <li>Rate limiting</li>
+                <li>Input validation</li>
+                <li>Password hashing</li>
+            </ul>
+        </body>
+        </html>
+    `);
+});
+
+app.get('/security-policy', (req, res) => {
+    res.setHeader('Content-Type', 'text/html');
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Security Policy - ProductiveFire</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body>
+            <h1>Security Policy</h1>
+            <h2>Responsible Disclosure</h2>
+            <p>We welcome security researchers to responsibly disclose security vulnerabilities.</p>
+            <h2>Scope</h2>
+            <p>This policy applies to all ProductiveFire services and applications.</p>
+            <h2>Contact</h2>
+            <p>Email: security@productivefire.com</p>
+        </body>
+        </html>
+    `);
+});
+
+// Additional security headers
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
 });
 
 // Error handling middleware

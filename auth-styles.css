@@ -684,24 +684,41 @@ body::before {
     gap: 12px;
     justify-content: center;
     margin: 16px 0;
+    align-items: center;
 }
 
 .otp-input {
     width: 48px !important;
-    height: 56px;
-    text-align: center;
-    font-size: 24px;
-    font-weight: 600;
+    height: 56px !important;
+    text-align: center !important;
+    font-size: 24px !important;
+    font-weight: 600 !important;
     border: 2px solid #e5e7eb !important;
-    border-radius: 12px;
-    background: #ffffff;
-    transition: all 0.3s ease;
+    border-radius: 12px !important;
+    background: #ffffff !important;
+    transition: all 0.3s ease !important;
+    box-sizing: border-box !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1 !important;
+    color: #1f2937 !important;
+    outline: none !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: textfield !important;
 }
 
 .otp-input:focus {
     border-color: #6366f1 !important;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-    transform: scale(1.05);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+    transform: scale(1.05) !important;
+    z-index: 10 !important;
+}
+
+.otp-input::-webkit-inner-spin-button,
+.otp-input::-webkit-outer-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
 }
 
 .otp-timer {
@@ -990,12 +1007,14 @@ body::before {
     
     .otp-input {
         width: 40px !important;
-        height: 48px;
-        font-size: 18px;
+        height: 48px !important;
+        font-size: 18px !important;
+        border-radius: 8px !important;
     }
     
     .otp-input-container {
-        gap: 6px;
+        gap: 6px !important;
+        margin: 12px 0 !important;
     }
     
     .toast {
