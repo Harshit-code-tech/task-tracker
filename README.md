@@ -129,7 +129,7 @@ task-tracker/
 ├── backend/                 # Node.js backend server
 │   ├── server.js           # Main server file
 │   ├── package.json        # Dependencies
-│   ├── .env.example        # Environment template
+│   ├── .env                # Environment template
 │   └── cleanup.js          # Database maintenance
 ├── home.html              # Landing page
 ├── login.html             # Authentication pages

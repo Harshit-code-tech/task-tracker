@@ -73,7 +73,7 @@ For Gmail:
 task-tracker/
 ├── vercel.json              # ✅ Vercel configuration
 ├── package.json             # ✅ Dependencies (root level)
-├── .env.production          # ✅ Production env template
+├── .env                      # ✅ Production env template
 ├── home.html               # ✅ Landing page
 ├── index.html              # ✅ Main app
 ├── backend/
