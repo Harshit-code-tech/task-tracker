@@ -118,7 +118,7 @@ app.use((req, res, next) => {
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), autoplay=(), fullscreen=(), picture-in-picture=()');
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
     next();
@@ -203,26 +203,49 @@ const connectDB = async () => {
             writeLog('INFO', 'Attempting MongoDB connection...', { 
                 hasUri: !!process.env.MONGODB_URI,
                 environment: process.env.NODE_ENV,
-                isVercel: process.env.VERCEL
+                isVercel: process.env.VERCEL,
+                uriLength: process.env.MONGODB_URI.length
             });
-            await mongoose.connect(process.env.MONGODB_URI);
-            writeLog('INFO', 'Connected to MongoDB', { 
+            
+            // Add connection timeout and retry logic
+            await mongoose.connect(process.env.MONGODB_URI, {
+                serverSelectionTimeoutMS: 10000, // 10 seconds
+                socketTimeoutMS: 45000, // 45 seconds
+                maxPoolSize: 10,
+                bufferCommands: false,
+                retryWrites: true
+            });
+            
+            writeLog('INFO', 'Successfully connected to MongoDB', { 
                 database: mongoose.connection.db.databaseName,
-                readyState: mongoose.connection.readyState 
+                readyState: mongoose.connection.readyState,
+                host: mongoose.connection.host,
+                name: mongoose.connection.name
             });
         } else {
-            writeLog('WARN', 'No MongoDB URI found, using in-memory storage', {
+            writeLog('ERROR', 'MongoDB URI is missing from environment variables', {
                 environment: process.env.NODE_ENV,
-                isVercel: process.env.VERCEL
+                isVercel: process.env.VERCEL,
+                availableEnvVars: Object.keys(process.env).filter(key => key.includes('MONGO'))
             });
+            throw new Error('MONGODB_URI environment variable is required');
         }
     } catch (error) {
-        writeLog('ERROR', 'MongoDB connection error', { 
+        writeLog('ERROR', 'MongoDB connection failed', { 
             error: error.message,
             code: error.code,
-            environment: process.env.NODE_ENV
+            name: error.name,
+            environment: process.env.NODE_ENV,
+            mongoUriExists: !!process.env.MONGODB_URI
         });
-        writeLog('WARN', 'Falling back to in-memory storage');
+        
+        // Don't fall back to in-memory storage in production
+        if (process.env.NODE_ENV === 'production') {
+            writeLog('FATAL', 'MongoDB connection required in production - not starting server');
+            throw error;
+        } else {
+            writeLog('WARN', 'Falling back to in-memory storage for development');
+        }
     }
 };
 
@@ -914,6 +937,12 @@ app.post('/api/auth/verify-signup', authLimiter, [
         // Verify OTP
         let otpDoc;
         if (isMongoConnected()) {
+            writeLog('DEBUG', 'MongoDB is connected, proceeding with OTP verification', {
+                email,
+                mongoState: mongoose.connection.readyState,
+                mongoHost: mongoose.connection.host
+            });
+            
             // First, clean up expired OTPs
             const now = new Date();
             const expiredCount = await Otp.deleteMany({ 
@@ -980,10 +1009,23 @@ app.post('/api/auth/verify-signup', authLimiter, [
                 otpAge: Math.round((now - otpDoc.createdAt) / 1000) // seconds
             });
         } else {
-            // If MongoDB is not connected but we're in production, still require OTP verification
+            // MongoDB is not connected - provide detailed error information
+            const errorDetails = {
+                mongoState: mongoose.connection.readyState,
+                hasMongoUri: !!process.env.MONGODB_URI,
+                environment: process.env.NODE_ENV,
+                isVercel: process.env.VERCEL,
+                connectionHost: mongoose.connection.host || 'none',
+                connectionName: mongoose.connection.name || 'none'
+            };
+            
+            writeLog('ERROR', 'MongoDB not connected during OTP verification', errorDetails);
+            
             if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
-                return res.status(400).json({ 
-                    error: 'Database connection required for OTP verification in production' 
+                return res.status(500).json({ 
+                    error: 'Database connection failed. Please try again in a moment.',
+                    details: 'MongoDB connection is required for OTP verification',
+                    debug: errorDetails
                 });
             }
             // For local development only, skip OTP verification
