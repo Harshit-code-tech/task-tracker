@@ -371,6 +371,73 @@ const Otp = mongoose.model('Otp', OtpSchema);
 const Task = mongoose.model('Task', TaskSchema);
 const Progress = mongoose.model('Progress', ProgressSchema);
 
+// Global connection promise to prevent multiple simultaneous connections
+let connectionPromise = null;
+
+// Helper function to ensure MongoDB connection
+const ensureMongoConnection = async () => {
+    if (mongoose.connection.readyState === 1) {
+        return true; // Already connected
+    }
+    
+    if (connectionPromise) {
+        // Connection attempt already in progress, wait for it
+        return connectionPromise;
+    }
+    
+    // Create new connection promise
+    connectionPromise = (async () => {
+        try {
+            if (mongoose.connection.readyState === 2) {
+                // Currently connecting, wait for it
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Connection timeout while waiting for existing connection'));
+                    }, 10000);
+                    
+                    mongoose.connection.once('connected', () => {
+                        clearTimeout(timeout);
+                        resolve();
+                    });
+                    
+                    mongoose.connection.once('error', (err) => {
+                        clearTimeout(timeout);
+                        reject(err);
+                    });
+                });
+            } else {
+                // Not connected, establish connection
+                writeLog('INFO', 'Establishing MongoDB connection on demand');
+                
+                const connectionOptions = {
+                    serverSelectionTimeoutMS: 5000,
+                    socketTimeoutMS: 30000,
+                    connectTimeoutMS: 10000,
+                    maxPoolSize: 1,
+                    minPoolSize: 0,
+                    maxIdleTimeMS: 30000,
+                    bufferCommands: false,
+                    retryWrites: true,
+                    retryReads: true,
+                    heartbeatFrequencyMS: 10000
+                };
+                
+                await mongoose.connect(process.env.MONGODB_URI, connectionOptions);
+                writeLog('INFO', 'MongoDB connection established on demand');
+            }
+            
+            connectionPromise = null; // Reset promise
+            return true;
+        } catch (error) {
+            connectionPromise = null; // Reset promise on error
+            writeLog('ERROR', 'Failed to establish MongoDB connection on demand', { error: error.message });
+            throw error;
+        }
+    })();
+    
+    return connectionPromise;
+};
+
 // Helper function to check if MongoDB is available
 const isMongoConnected = () => {
     const connected = mongoose.connection.readyState === 1 && process.env.MONGODB_URI;
@@ -390,21 +457,24 @@ const isMongoConnected = () => {
 };
 
 // Database connectivity middleware for critical endpoints
-const requireDatabaseConnection = (req, res, next) => {
-    if (!isMongoConnected()) {
-        writeLog('ERROR', 'Database required but not connected', {
+const requireDatabaseConnection = async (req, res, next) => {
+    try {
+        await ensureMongoConnection();
+        next();
+    } catch (error) {
+        writeLog('ERROR', 'Database connection failed in middleware', {
             endpoint: req.path,
             method: req.method,
+            error: error.message,
             mongoState: mongoose.connection.readyState,
             hasUri: !!process.env.MONGODB_URI
         });
         
         return res.status(503).json({ 
             error: 'Database connection failed. Please try again in a moment.',
-            retryAfter: 5 // Suggest client retry after 5 seconds
+            retryAfter: 5
         });
     }
-    next();
 };
 
 // Email utility functions
