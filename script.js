@@ -314,7 +314,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize user authentication
     console.log('📱 Setting up authentication');
-    userAuth = new UserAuth();
+    // Check if BackendUserAuth is available and not already initialized
+    if (typeof BackendUserAuth !== 'undefined' && !window.backendUserAuthInstance) {
+        userAuth = new BackendUserAuth();
+        console.log('✅ Using BackendUserAuth for authentication');
+    } else if (window.backendUserAuthInstance) {
+        userAuth = window.backendUserAuthInstance;
+        console.log('✅ Using existing BackendUserAuth instance');
+    } else {
+        userAuth = new UserAuth();
+        console.log('⚠️ Falling back to UserAuth (BackendUserAuth not available)');
+    }
     
     // Initialize robot only when main app is visible
     const mainApp = document.getElementById('mainApp');
@@ -1695,25 +1705,27 @@ class UserAuth {
     }
     
     checkExistingLogin() {
-        // Check for the correct localStorage keys used by the auth system
-        const savedUser = localStorage.getItem('productivefire_user');
-        const authToken = localStorage.getItem('productivefire_token');
+        // Auth is now handled by api-service.js and auth-common.js
+        console.log('🔍 Script.js checking for existing login...');
         
-        if (savedUser && authToken) {
-            this.currentUser = JSON.parse(savedUser);
-            this.showMainApp();
-            this.updateUserStats();
-        } else {
-            // Also check for legacy key for backwards compatibility
-            const legacyUser = localStorage.getItem('taskTrackerCurrentUser');
-            if (legacyUser) {
-                this.currentUser = JSON.parse(legacyUser);
+        // Check both sessionStorage (new) and localStorage (migration) 
+        const token = sessionStorage.getItem('productivefire_token') || localStorage.getItem('productivefire_token');
+        const userData = sessionStorage.getItem('productivefire_user') || localStorage.getItem('productivefire_user');
+        
+        if (token && userData) {
+            try {
+                this.currentUser = JSON.parse(userData);
+                console.log('✅ User data loaded:', this.currentUser);
                 this.showMainApp();
                 this.updateUserStats();
-            } else {
-                // Redirect to home page for authentication
-                window.location.href = 'home.html';
+            } catch (error) {
+                console.error('Error parsing user data:', error);
+                this.showMainApp(); // Show app anyway
             }
+        } else {
+            console.log('⚠️ No user authentication found in script.js');
+            // Don't redirect - let auth-common.js handle it
+            this.showMainApp(); // Show app anyway, auth will be handled by api-service.js
         }
     }
     
@@ -2060,14 +2072,21 @@ class UserAuth {
             userSignedIn.style.display = 'flex';
         }
         
+        // Check if currentUser exists before accessing properties
+        if (!this.currentUser) {
+            console.warn('No current user data available for profile display');
+            return;
+        }
+        
         const userName = document.getElementById('userName');
-        if (userName) {
+        if (userName && this.currentUser.name) {
             userName.textContent = this.currentUser.name;
         }
         
         const userStreak = document.getElementById('userStreak');
         if (userStreak) {
-            userStreak.textContent = `🔥 ${this.currentUser.streak} day streak`;
+            const streak = this.currentUser.streak || 0;
+            userStreak.textContent = `🔥 ${streak} day streak`;
         }
         
         this.updateAvatarDisplay();
@@ -2077,8 +2096,17 @@ class UserAuth {
         const avatar = document.getElementById('userAvatar');
         const initials = document.getElementById('userInitials');
         
-        if (!avatar || !initials || !this.currentUser) {
-            console.warn('Avatar elements not found or user not logged in');
+        if (!avatar || !initials) {
+            console.warn('Avatar elements not found in DOM');
+            return;
+        }
+        
+        if (!this.currentUser || !this.currentUser.name) {
+            console.warn('No current user data available for avatar display');
+            // Set default initials
+            initials.textContent = '??';
+            avatar.style.display = 'none';
+            initials.style.display = 'flex';
             return;
         }
         
@@ -2089,9 +2117,7 @@ class UserAuth {
             avatar.style.opacity = '1';
             initials.style.display = 'none';
         } else {
-            const userInitials = this.currentUser.name ? 
-                this.currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase() : 
-                '??';
+            const userInitials = this.currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase();
             initials.textContent = userInitials;
             avatar.style.display = 'none';
             initials.style.display = 'flex';
@@ -2108,26 +2134,40 @@ class UserAuth {
         const profileEmail = document.getElementById('profileEmail');
         const soundToggle = document.getElementById('soundToggle');
         
-        if (!profileName || !profileEmail || !soundToggle || !this.currentUser) {
-            console.warn('Profile elements not found or user not logged in');
+        if (!this.currentUser) {
+            console.warn('No current user data available for user menu');
             return;
         }
         
-        // Populate form fields
+        if (!profileName || !profileEmail) {
+            console.warn('Profile form elements not found in DOM');
+            return;
+        }
+        
+        // Populate form fields with current user data
         profileName.value = this.currentUser.name || '';
         profileEmail.value = this.currentUser.email || '';
-        soundToggle.checked = this.currentUser.settings?.soundEnabled ?? true;
-        
-        const notificationsToggle = document.getElementById('notificationsToggle');
-        if (notificationsToggle) {
-            notificationsToggle.checked = this.currentUser.settings?.notificationsEnabled ?? true;
-        }
         
         // Make sure form elements are visible and styled
         profileName.style.visibility = 'visible';
         profileName.style.opacity = '1';
         profileEmail.style.visibility = 'visible';
         profileEmail.style.opacity = '1';
+        
+        // Handle optional elements
+        if (soundToggle) {
+            soundToggle.checked = this.currentUser.settings?.soundEnabled ?? true;
+        }
+        
+        const notificationsToggle = document.getElementById('notificationsToggle');
+        if (notificationsToggle) {
+            notificationsToggle.checked = this.currentUser.settings?.notificationsEnabled ?? true;
+        }
+        
+        console.log('✅ User menu populated with:', {
+            name: this.currentUser.name,
+            email: this.currentUser.email
+        });
         
         // Update large avatar
         const avatarLarge = document.getElementById('profileAvatarLarge');
@@ -2182,8 +2222,19 @@ class UserAuth {
     }
     
     signOut() {
+        console.log('🚪 Script.js signOut called...');
+        
+        // Clear all authentication data
+        sessionStorage.removeItem('productivefire_token');
+        sessionStorage.removeItem('productivefire_user');
+        sessionStorage.removeItem('taskTrackerCurrentUser');
+        sessionStorage.removeItem('authToken');
+        
         localStorage.removeItem('productivefire_token');
         localStorage.removeItem('productivefire_user');
+        localStorage.removeItem('taskTrackerCurrentUser');
+        localStorage.removeItem('authToken');
+        
         this.currentUser = null;
         
         this.hideModals();
@@ -2192,6 +2243,8 @@ class UserAuth {
             robot.say('Thanks for being productive! See you soon! 👋');
             robot.setMood('sad');
         }
+        
+        console.log('✅ All user data cleared, redirecting to home...');
         
         // Redirect to home page
         window.location.href = 'home.html';
@@ -2239,15 +2292,36 @@ function updateStats() {
     updateAlgorithmsProgress();
 }
 
+// Throttle analytics updates to prevent lag
+let analyticsUpdateTimeout = null;
+const ANALYTICS_UPDATE_DELAY = 300; // 300ms delay
+
 function updateAnalytics() {
+    // Clear any pending analytics update
+    if (analyticsUpdateTimeout) {
+        clearTimeout(analyticsUpdateTimeout);
+    }
+    
+    // Throttle the actual update
+    analyticsUpdateTimeout = setTimeout(() => {
+        updateAnalyticsImmediate();
+        analyticsUpdateTimeout = null;
+    }, ANALYTICS_UPDATE_DELAY);
+}
+
+function updateAnalyticsImmediate() {
     try {
         console.log('📊 Updating analytics...');
         
-        const totalTasks = tasks.length;
-        const completedTasks = tasks.filter(t => t.completed).length;
+        // Ensure we have valid data arrays
+        const validTasks = Array.isArray(tasks) ? tasks : [];
+        const validDsaProgress = typeof dsaProgress === 'object' && dsaProgress !== null ? dsaProgress : {};
+        
+        const totalTasks = validTasks.length;
+        const completedTasks = validTasks.filter(t => t.completed).length;
         const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
         
-        const upcomingDeadlines = tasks.filter(t => {
+        const upcomingDeadlines = validTasks.filter(t => {
             if (!t.deadline || t.completed) return false;
             const deadline = new Date(t.deadline);
             const now = new Date();
@@ -2256,101 +2330,173 @@ function updateAnalytics() {
         }).length;
         
         // Calculate combined progress (DSA + NeetCode + Algorithms)
-        const totalDSAProblems = Object.values(dsaProblems).flat().length;
-        const completedDSA = Object.keys(dsaProgress).length;
-        const dsaPercentage = Math.round((completedDSA / totalDSAProblems) * 100);
+        let totalDSAProblems = 0;
+        if (typeof dsaProblems === 'object' && dsaProblems !== null) {
+            totalDSAProblems = Object.values(dsaProblems).flat().length;
+        }
+        const completedDSA = Object.keys(validDsaProgress).length;
+        const dsaPercentage = totalDSAProblems > 0 ? Math.round((completedDSA / totalDSAProblems) * 100) : 0;
         
         // Calculate daily streak
         const streak = calculateDailyStreak();
         
-        console.log('📊 Analytics data:', { completionRate, streak, upcomingDeadlines, dsaPercentage });
+        console.log('📊 Analytics data:', { completionRate, streak, upcomingDeadlines, dsaPercentage, totalTasks, completedTasks });
         
         // Update DOM elements with error checking
-        const completionRateEl = document.getElementById('completionRate');
-        const dailyStreakEl = document.getElementById('dailyStreak');
-        const upcomingDeadlinesEl = document.getElementById('upcomingDeadlines');
-        const neetcodeMetricEl = document.getElementById('neetcodeMetric');
+        const elements = {
+            completionRate: document.getElementById('completionRate'),
+            dailyStreak: document.getElementById('dailyStreak'),
+            upcomingDeadlines: document.getElementById('upcomingDeadlines'),
+            neetcodeMetric: document.getElementById('neetcodeMetric')
+        };
         
-        if (completionRateEl) completionRateEl.textContent = `${completionRate}%`;
-        if (dailyStreakEl) dailyStreakEl.textContent = streak;
-        if (upcomingDeadlinesEl) upcomingDeadlinesEl.textContent = upcomingDeadlines;
-        if (neetcodeMetricEl) neetcodeMetricEl.textContent = `${dsaPercentage}%`;
+        console.log('🔍 Analytics DOM elements found:', {
+            completionRate: !!elements.completionRate,
+            dailyStreak: !!elements.dailyStreak,
+            upcomingDeadlines: !!elements.upcomingDeadlines,
+            neetcodeMetric: !!elements.neetcodeMetric
+        });
         
-        renderCategoryBreakdown();
+        // Safely update each element
+        if (elements.completionRate) {
+            elements.completionRate.textContent = `${completionRate}%`;
+            console.log('✅ Updated completionRate to:', `${completionRate}%`);
+        } else {
+            console.warn('❌ completionRate element not found');
+        }
+        
+        if (elements.dailyStreak) {
+            elements.dailyStreak.textContent = streak;
+            console.log('✅ Updated dailyStreak to:', streak);
+        } else {
+            console.warn('❌ dailyStreak element not found');
+        }
+        
+        if (elements.upcomingDeadlines) {
+            elements.upcomingDeadlines.textContent = upcomingDeadlines;
+            console.log('✅ Updated upcomingDeadlines to:', upcomingDeadlines);
+        } else {
+            console.warn('❌ upcomingDeadlines element not found');
+        }
+        
+        if (elements.neetcodeMetric) {
+            elements.neetcodeMetric.textContent = `${dsaPercentage}%`;
+            console.log('✅ Updated neetcodeMetric to:', `${dsaPercentage}%`);
+        } else {
+            console.warn('❌ neetcodeMetric element not found');
+        }
+        
+        // Update category breakdown if function exists
+        if (typeof renderCategoryBreakdown === 'function') {
+            renderCategoryBreakdown();
+        }
         
         console.log('✅ Analytics updated successfully');
     } catch (error) {
         console.error('❌ Error updating analytics:', error);
+        
+        // Set default values if update fails
+        const fallbackElements = {
+            completionRate: document.getElementById('completionRate'),
+            dailyStreak: document.getElementById('dailyStreak'),
+            upcomingDeadlines: document.getElementById('upcomingDeadlines'),
+            neetcodeMetric: document.getElementById('neetcodeMetric')
+        };
+        
+        if (fallbackElements.completionRate) fallbackElements.completionRate.textContent = '0%';
+        if (fallbackElements.dailyStreak) fallbackElements.dailyStreak.textContent = '0';
+        if (fallbackElements.upcomingDeadlines) fallbackElements.upcomingDeadlines.textContent = '0';
+        if (fallbackElements.neetcodeMetric) fallbackElements.neetcodeMetric.textContent = '0%';
     }
 }
 
 function calculateDailyStreak() {
-    const completedTasks = tasks.filter(t => t.completed && t.completedAt);
-    if (completedTasks.length === 0) return 0;
-    
-    // Sort by completion date
-    completedTasks.sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
-    
-    let streak = 0;
-    const today = new Date();
-    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-    
-    // Check if there's any task completed today or yesterday
-    const recentCompletion = completedTasks.find(t => {
-        const completedDate = new Date(t.completedAt);
-        return isSameDay(completedDate, today) || isSameDay(completedDate, yesterday);
-    });
-    
-    if (!recentCompletion) return 0;
-    
-    // Count consecutive days
-    const uniqueDays = [...new Set(completedTasks.map(t => {
-        const date = new Date(t.completedAt);
-        return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-    }))];
-    
-    let currentDate = new Date();
-    for (const dayKey of uniqueDays) {
-        const [year, month, day] = dayKey.split('-').map(Number);
-        const taskDate = new Date(year, month, day);
+    try {
+        const validTasks = Array.isArray(tasks) ? tasks : [];
+        const completedTasks = validTasks.filter(t => t.completed && t.completedAt);
+        if (completedTasks.length === 0) return 0;
         
-        if (isSameDay(taskDate, currentDate) || isSameDay(taskDate, new Date(currentDate.getTime() - 24 * 60 * 60 * 1000))) {
-            streak++;
-            currentDate = new Date(currentDate.getTime() - 24 * 60 * 60 * 1000);
-        } else {
-            break;
+        // Sort by completion date
+        completedTasks.sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+        
+        let streak = 0;
+        const today = new Date();
+        const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+        
+        // Check if there's any task completed today or yesterday
+        const recentCompletion = completedTasks.find(t => {
+            const completedDate = new Date(t.completedAt);
+            return isSameDay(completedDate, today) || isSameDay(completedDate, yesterday);
+        });
+        
+        if (!recentCompletion) return 0;
+        
+        // Count consecutive days with completions
+        let currentDate = new Date(today);
+        
+        for (let i = 0; i < 30; i++) { // Check last 30 days max
+            const hasCompletionOnDay = completedTasks.some(t => 
+                isSameDay(new Date(t.completedAt), currentDate)
+            );
+            
+            if (hasCompletionOnDay) {
+                streak++;
+            } else {
+                // Allow one day gap (yesterday to today)
+                if (i === 0 && !isSameDay(currentDate, today)) {
+                    currentDate.setDate(currentDate.getDate() - 1);
+                    continue;
+                }
+                break;
+            }
+            
+            currentDate.setDate(currentDate.getDate() - 1);
         }
+        
+        return streak;
+    } catch (error) {
+        console.error('Error calculating daily streak:', error);
+        return 0;
     }
-    
-    return streak;
 }
 
 function renderCategoryBreakdown() {
-    const categories = {};
-    tasks.forEach(task => {
-        const category = task.category || 'Uncategorized';
-        if (!categories[category]) {
-            categories[category] = { total: 0, completed: 0 };
+    try {
+        const validTasks = Array.isArray(tasks) ? tasks : [];
+        const categories = {};
+        
+        validTasks.forEach(task => {
+            const category = task.category || 'Uncategorized';
+            if (!categories[category]) {
+                categories[category] = { total: 0, completed: 0 };
+            }
+            categories[category].total++;
+            if (task.completed) categories[category].completed++;
+        });
+        
+        const container = document.getElementById('categoryBreakdown');
+        if (!container) {
+            console.warn('Category breakdown container not found');
+            return;
         }
-        categories[category].total++;
-        if (task.completed) categories[category].completed++;
-    });
-    
-    const container = document.getElementById('categoryBreakdown');
-    container.innerHTML = Object.entries(categories).map(([category, stats]) => {
-        const percentage = Math.round((stats.completed / stats.total) * 100);
-        return `
-            <div style="margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                    <span style="font-weight: 500;">${category}</span>
-                    <span style="color: #666;">${stats.completed}/${stats.total} (${percentage}%)</span>
+        
+        container.innerHTML = Object.entries(categories).map(([category, stats]) => {
+            const percentage = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+            return `
+                <div style="margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span style="font-weight: 500;">${category}</span>
+                        <span style="color: #666;">${stats.completed}/${stats.total} (${percentage}%)</span>
+                    </div>
+                    <div style="width: 100%; height: 6px; background: #f1f1f1; border-radius: 3px; overflow: hidden;">
+                        <div style="width: ${percentage}%; height: 100%; background: linear-gradient(135deg, #667eea, #764ba2);"></div>
+                    </div>
                 </div>
-                <div style="width: 100%; height: 6px; background: #f1f1f1; border-radius: 3px; overflow: hidden;">
-                    <div style="width: ${percentage}%; height: 100%; background: linear-gradient(135deg, #667eea, #764ba2);"></div>
-                </div>
-            </div>
-        `;
-    }).join('');
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error rendering category breakdown:', error);
+    }
 }
 
 function renderWeeklyChart() {

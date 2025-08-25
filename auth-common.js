@@ -155,11 +155,12 @@ const AuthUtils = {
         if (typeof window !== 'undefined') {
             // Browser environment
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                // Local development
+                // Local development - use http for localhost
                 return 'http://localhost:3001/api';
             } else {
-                // Production (Vercel or other hosting)
-                return `${window.location.protocol}//${window.location.host}/api`;
+                // Production - always use https for external domains
+                const protocol = window.location.protocol === 'http:' && window.location.hostname !== 'localhost' ? 'https:' : window.location.protocol;
+                return `${protocol}//${window.location.host}/api`;
             }
         }
         // Fallback for server-side or unknown environment
@@ -207,27 +208,51 @@ const AuthUtils = {
         }
     },
     
-    // Local storage helpers
+    // Session storage helpers (more secure, cleared on browser close)
     setUserData(userData) {
-        localStorage.setItem('productivefire_user', JSON.stringify(userData));
+        // Store in both formats for compatibility
+        sessionStorage.setItem('productivefire_user', JSON.stringify(userData));
+        sessionStorage.setItem('taskTrackerCurrentUser', JSON.stringify(userData));
     },
     
     getUserData() {
-        const data = localStorage.getItem('productivefire_user');
+        // Check all possible user data storage locations for compatibility
+        const data = sessionStorage.getItem('productivefire_user') || 
+                    sessionStorage.getItem('taskTrackerCurrentUser') ||
+                    localStorage.getItem('productivefire_user') ||
+                    localStorage.getItem('taskTrackerCurrentUser');
         return data ? JSON.parse(data) : null;
     },
     
     clearUserData() {
+        // Clear all possible storage locations
+        sessionStorage.removeItem('productivefire_user');
+        sessionStorage.removeItem('taskTrackerCurrentUser');
+        sessionStorage.removeItem('productivefire_token');
+        sessionStorage.removeItem('authToken');
+        
+        // Also clear any localStorage items from old versions
         localStorage.removeItem('productivefire_user');
+        localStorage.removeItem('taskTrackerCurrentUser');
         localStorage.removeItem('productivefire_token');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('verification_email');
+        localStorage.removeItem('verification_name');
+        localStorage.removeItem('verification_password');
     },
     
     setToken(token) {
-        localStorage.setItem('productivefire_token', token);
+        // Store in both formats for compatibility
+        sessionStorage.setItem('productivefire_token', token);
+        sessionStorage.setItem('authToken', token);
     },
     
     getToken() {
-        return localStorage.getItem('productivefire_token');
+        // Check all possible token storage locations for compatibility
+        return sessionStorage.getItem('productivefire_token') || 
+               sessionStorage.getItem('authToken') ||
+               localStorage.getItem('productivefire_token') ||
+               localStorage.getItem('authToken');
     },
     
     // Redirect helper
@@ -264,27 +289,43 @@ document.addEventListener('DOMContentLoaded', () => {
         userData: userData ? 'exists' : 'null',
         currentPage: window.location.pathname.split('/').pop()
     });
-    
-    // Send auth check to server log
-    const apiBaseUrl = window.location.origin; // Use current domain for API calls
-    fetch(`${apiBaseUrl}/api/auth/log-check`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            hasToken: !!token,
-            hasUserData: !!userData,
-            page: window.location.pathname.split('/').pop()
-        })
-    }).catch(() => {}); // Ignore errors for logging
-    
+
     // If on auth pages and already logged in, redirect to app
-    const authPages = ['login.html', 'signup.html', 'forgot-password.html'];
+    const authPages = ['login.html', 'signup.html', 'forgot-password.html', 'verify-email.html'];
     const currentPage = window.location.pathname.split('/').pop();
     
     if (token && userData && authPages.includes(currentPage)) {
+        // Don't redirect if BackendUserAuth signin is in progress
+        if (sessionStorage.getItem('backend_signin_complete')) {
+            console.log('🔄 Backend signin in progress, skipping auth-common redirect');
+            sessionStorage.removeItem('backend_signin_complete');
+            return;
+        }
+        
         console.log('🔄 User already logged in, redirecting to app...');
-        AuthUtils.redirectToApp();
+        // Use a flag to prevent infinite redirects
+        if (!sessionStorage.getItem('redirect_in_progress')) {
+            sessionStorage.setItem('redirect_in_progress', 'true');
+            setTimeout(() => {
+                sessionStorage.removeItem('redirect_in_progress');
+                AuthUtils.redirectToApp();
+            }, 100);
+        }
     } else if (authPages.includes(currentPage)) {
         console.log('👤 No valid session found, staying on auth page');
     }
+    
+    // Send auth check to server log (moved to end to avoid blocking)
+    setTimeout(() => {
+        const apiBaseUrl = window.location.origin;
+        fetch(`${apiBaseUrl}/api/auth/log-check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                hasToken: !!token,
+                hasUserData: !!userData,
+                page: window.location.pathname.split('/').pop()
+            })
+        }).catch(() => {}); // Ignore errors for logging
+    }, 200);
 });

@@ -32,15 +32,68 @@
 <body>
     <!-- Authentication Check Script -->
     <script>
-        // Immediate authentication check - redirect if not logged in
+        // Immediate authentication check - but more comprehensive and less aggressive
         (function() {
-            const token = localStorage.getItem('productivefire_token');
-            const userData = localStorage.getItem('productivefire_user');
-            
-            if (!token || !userData) {
-                // Not authenticated, redirect to home
-                window.location.href = 'home.html';
+            // Don't run if already executed
+            if (sessionStorage.getItem('immediate_auth_checked')) {
+                console.log('⚡ Immediate auth check already completed');
                 return;
+            }
+            
+            console.log('🔍 Running immediate authentication check...');
+            
+            // Check multiple token formats for compatibility
+            const token = sessionStorage.getItem('productivefire_token') || 
+                         sessionStorage.getItem('authToken') ||
+                         localStorage.getItem('productivefire_token') || 
+                         localStorage.getItem('authToken');
+                         
+            const userData = sessionStorage.getItem('productivefire_user') || 
+                           sessionStorage.getItem('taskTrackerCurrentUser') ||
+                           localStorage.getItem('productivefire_user') || 
+                           localStorage.getItem('taskTrackerCurrentUser');
+            
+            // Mark that we've done the immediate check
+            sessionStorage.setItem('immediate_auth_checked', 'true');
+            
+            // Only redirect if we're absolutely sure there's no authentication data
+            if (!token && !userData) {
+                console.log('❌ No authentication data found, redirecting to home...');
+                // Not authenticated, redirect to home (but check if we're already redirecting)
+                if (!sessionStorage.getItem('redirect_in_progress')) {
+                    sessionStorage.setItem('redirect_in_progress', 'true');
+                    setTimeout(() => {
+                        sessionStorage.removeItem('redirect_in_progress');
+                        sessionStorage.removeItem('immediate_auth_checked');
+                        window.location.href = 'home.html';
+                    }, 1000); // Give more time for auth system to load
+                }
+                return;
+            }
+            
+            console.log('✅ Authentication data found, staying on main app');
+            
+            // Mark that auth check is complete and user is authenticated
+            sessionStorage.setItem('auth_check_done', 'true');
+            
+            // If we have token but it's in localStorage, migrate to sessionStorage
+            if (localStorage.getItem('productivefire_token') && !sessionStorage.getItem('productivefire_token')) {
+                sessionStorage.setItem('productivefire_token', token);
+                sessionStorage.setItem('productivefire_user', userData);
+                localStorage.removeItem('productivefire_token');
+                localStorage.removeItem('productivefire_user');
+            }
+            
+            // Also migrate authToken if needed
+            if (localStorage.getItem('authToken') && !sessionStorage.getItem('authToken')) {
+                sessionStorage.setItem('authToken', localStorage.getItem('authToken'));
+                localStorage.removeItem('authToken');
+            }
+            
+            // Also migrate taskTrackerCurrentUser if needed
+            if (localStorage.getItem('taskTrackerCurrentUser') && !sessionStorage.getItem('taskTrackerCurrentUser')) {
+                sessionStorage.setItem('taskTrackerCurrentUser', localStorage.getItem('taskTrackerCurrentUser'));
+                localStorage.removeItem('taskTrackerCurrentUser');
             }
         })();
     </script>
@@ -754,6 +807,7 @@
 
     <script src="dsa-data.js"></script>
     <script src="neetcode-data.js"></script>
+    <script src="api-service.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

@@ -29,11 +29,11 @@ class EmailVerificationManager {
     }
     
     loadUserData() {
-        // Get user data from URL parameters or localStorage
+        // Get user data from URL parameters or sessionStorage
         const urlParams = new URLSearchParams(window.location.search);
-        this.userEmail = urlParams.get('email') || localStorage.getItem('verification_email');
-        this.userName = urlParams.get('name') || localStorage.getItem('verification_name');
-        this.userPassword = localStorage.getItem('verification_password');
+        this.userEmail = urlParams.get('email') || sessionStorage.getItem('verification_email');
+        this.userName = urlParams.get('name') || sessionStorage.getItem('verification_name');
+        this.userPassword = sessionStorage.getItem('verification_password');
         
         if (!this.userEmail) {
             toast.show('error', 'No email found for verification. Redirecting to signup...');
@@ -295,6 +295,10 @@ class EmailVerificationManager {
     }
     
     clearVerificationData() {
+        sessionStorage.removeItem('verification_email');
+        sessionStorage.removeItem('verification_name');
+        sessionStorage.removeItem('verification_password');
+        // Also clear any localStorage items from old versions
         localStorage.removeItem('verification_email');
         localStorage.removeItem('verification_name');
         localStorage.removeItem('verification_password');

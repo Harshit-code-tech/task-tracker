@@ -225,9 +225,9 @@ class SignupManager {
             
             if (response.success) {
                 // Store temporary verification data
-                localStorage.setItem('verification_email', this.userEmail);
-                localStorage.setItem('verification_name', this.userName);
-                localStorage.setItem('verification_password', this.userPassword);
+                sessionStorage.setItem('verification_email', this.userEmail);
+                sessionStorage.setItem('verification_name', this.userName);
+                sessionStorage.setItem('verification_password', this.userPassword);
                 
                 toast.show('success', 'Verification code sent! Redirecting to verification page...');
                 

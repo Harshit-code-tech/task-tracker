@@ -3,7 +3,21 @@ class APIService {
     constructor() {
         // Automatically detect the base URL based on environment
         this.baseURL = this.getBaseURL();
-        this.token = localStorage.getItem('authToken');
+        // Load token from sessionStorage first, then localStorage for migration
+        this.token = sessionStorage.getItem('authToken') || 
+                    sessionStorage.getItem('productivefire_token') ||
+                    localStorage.getItem('authToken') ||
+                    localStorage.getItem('productivefire_token');
+        
+        // If found in localStorage, migrate to sessionStorage
+        if (!sessionStorage.getItem('authToken') && localStorage.getItem('authToken')) {
+            sessionStorage.setItem('authToken', localStorage.getItem('authToken'));
+            localStorage.removeItem('authToken');
+        }
+        if (!sessionStorage.getItem('productivefire_token') && localStorage.getItem('productivefire_token')) {
+            sessionStorage.setItem('productivefire_token', localStorage.getItem('productivefire_token'));
+            localStorage.removeItem('productivefire_token');
+        }
     }
 
     // Detect base URL for different environments
@@ -26,9 +40,15 @@ class APIService {
     setToken(token) {
         this.token = token;
         if (token) {
-            localStorage.setItem('authToken', token);
+            // Store in both formats for compatibility
+            sessionStorage.setItem('authToken', token);
+            sessionStorage.setItem('productivefire_token', token);
         } else {
+            // Clear both formats
+            sessionStorage.removeItem('authToken');
+            sessionStorage.removeItem('productivefire_token');
             localStorage.removeItem('authToken');
+            localStorage.removeItem('productivefire_token');
         }
     }
 
@@ -95,6 +115,8 @@ class APIService {
 
     signout() {
         this.setToken(null);
+        sessionStorage.removeItem('taskTrackerCurrentUser');
+        // Clean up localStorage as well for migration
         localStorage.removeItem('taskTrackerCurrentUser');
     }
 
@@ -154,16 +176,48 @@ class APIService {
 // Enhanced UserAuth class that uses backend
 class BackendUserAuth {
     constructor() {
+        // Prevent multiple instances
+        if (window.backendUserAuthInstance) {
+            console.warn('🔄 BackendUserAuth instance already exists, returning existing instance');
+            return window.backendUserAuthInstance;
+        }
+        
         this.currentUser = null;
-        this.users = JSON.parse(localStorage.getItem('taskTrackerUsers')) || {};
+        // Remove localStorage usage for users storage - use backend only
+        this.users = {}; // Will be loaded from backend when needed
         this.api = new APIService();
-        this.checkBackendConnection();
+        this.backendAvailable = false;
+        this.isInitialized = false;
+        this.loadingTasks = false; // Prevent multiple task loads
+        
+        // Mark this as the active instance
+        window.backendUserAuthInstance = this;
+        
+        console.log('🚀 BackendUserAuth initialized');
         this.init();
     }
     
-    init() {
+    async init() {
+        if (this.isInitialized) {
+            console.warn('⚠️ BackendUserAuth already initialized');
+            return;
+        }
+        
+        this.isInitialized = true;
+        console.log('🔧 BackendUserAuth: Starting initialization...');
+        
+        // Setup event listeners first (no async needed)
         this.setupEventListeners();
-        this.checkExistingLogin();
+        
+        // Then do async operations
+        try {
+            await this.checkBackendConnection();
+            await this.checkExistingLogin();
+        } catch (error) {
+            console.error('❌ Auth initialization failed:', error);
+            // Fall back to showing auth guard if something goes wrong
+            this.handleNoAuthentication();
+        }
     }
     
     setupEventListeners() {
@@ -185,8 +239,11 @@ class BackendUserAuth {
         if (signInBtn) signInBtn.addEventListener('click', () => this.showSignInModal());
         if (signUpBtn) signUpBtn.addEventListener('click', () => this.showSignUpModal());
         
-        document.getElementById('userMenuBtn').addEventListener('click', () => this.showUserMenu());
-        document.getElementById('signOutBtn').addEventListener('click', () => this.signOut());
+        const userMenuBtn = document.getElementById('userMenuBtn');
+        const signOutBtn = document.getElementById('signOutBtn');
+        
+        if (userMenuBtn) userMenuBtn.addEventListener('click', () => this.showUserMenu());
+        if (signOutBtn) signOutBtn.addEventListener('click', () => this.signOut());
 
         // Close buttons for modals
         document.querySelectorAll('.close').forEach(closeBtn => {
@@ -203,40 +260,54 @@ class BackendUserAuth {
         });
 
         // Form submissions
-        document.getElementById('signInForm').addEventListener('submit', (e) => this.handleSignIn(e));
-        document.getElementById('signUpForm').addEventListener('submit', (e) => this.handleSignUp(e));
-        document.getElementById('profileForm').addEventListener('submit', (e) => this.handleProfileUpdate(e));
+        const signInForm = document.getElementById('signInForm');
+        const signUpForm = document.getElementById('signUpForm');
+        const profileForm = document.getElementById('profileForm');
+        
+        if (signInForm) signInForm.addEventListener('submit', (e) => this.handleSignIn(e));
+        if (signUpForm) signUpForm.addEventListener('submit', (e) => this.handleSignUp(e));
+        if (profileForm) profileForm.addEventListener('submit', (e) => this.handleProfileUpdate(e));
         
         // Modal switching
-        document.getElementById('switchToSignUp').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.hideModals();
-            this.showSignUpModal();
-        });
-        document.getElementById('switchToSignIn').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.hideModals();
-            this.showSignInModal();
-        });
+        const switchToSignUp = document.getElementById('switchToSignUp');
+        const switchToSignIn = document.getElementById('switchToSignIn');
         
-        // Form submissions
-        document.getElementById('signInForm').addEventListener('submit', (e) => this.handleSignIn(e));
-        document.getElementById('signUpForm').addEventListener('submit', (e) => this.handleSignUp(e));
-        document.getElementById('profileForm').addEventListener('submit', (e) => this.handleProfileUpdate(e));
+        if (switchToSignUp) {
+            switchToSignUp.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.hideModals();
+                this.showSignUpModal();
+            });
+        }
+        
+        if (switchToSignIn) {
+            switchToSignIn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.hideModals();
+                this.showSignInModal();
+            });
+        }
         
         // Avatar upload
-        document.getElementById('changeAvatarBtn').addEventListener('click', () => {
-            document.getElementById('avatarUpload').click();
-        });
-        document.getElementById('avatarUpload').addEventListener('change', (e) => this.handleAvatarUpload(e));
+        const changeAvatarBtn = document.getElementById('changeAvatarBtn');
+        const avatarUpload = document.getElementById('avatarUpload');
+        if (changeAvatarBtn && avatarUpload) {
+            changeAvatarBtn.addEventListener('click', () => {
+                avatarUpload.click();
+            });
+            avatarUpload.addEventListener('change', (e) => this.handleAvatarUpload(e));
+        }
         
         // Settings
-        document.getElementById('soundToggle').addEventListener('change', (e) => {
-            if (robot) {
-                robot.soundEnabled = e.target.checked;
-            }
-            this.saveUserSettings();
-        });
+        const soundToggle = document.getElementById('soundToggle');
+        if (soundToggle) {
+            soundToggle.addEventListener('change', (e) => {
+                if (robot) {
+                    robot.soundEnabled = e.target.checked;
+                }
+                this.saveUserSettings();
+            });
+        }
         
         // Close modals
         document.querySelectorAll('.close').forEach(btn => {
@@ -252,27 +323,55 @@ class BackendUserAuth {
     }
 
     async checkBackendConnection() {
-        const health = await this.api.healthCheck();
-        if (health.status === 'OK') {
-            console.log('✅ Backend connected successfully');
-            this.backendAvailable = true;
-        } else {
-            console.warn('⚠️ Backend not available, falling back to localStorage');
+        // Only skip if we've already confirmed backend is available
+        if (this.backendAvailable === true) {
+            console.log('⚡ Backend connection already confirmed');
+            return;
+        }
+        
+        console.log('🔍 Checking backend connection...');
+        try {
+            // Add timeout to health check to improve responsiveness
+            const healthCheckPromise = this.api.healthCheck();
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Health check timeout')), 3000)
+            );
+            
+            const health = await Promise.race([healthCheckPromise, timeoutPromise]);
+            
+            if (health && health.status === 'OK') {
+                console.log('✅ Backend connected successfully');
+                this.backendAvailable = true;
+            } else {
+                console.warn('⚠️ Backend health check returned non-OK status:', health);
+                this.backendAvailable = false;
+            }
+        } catch (error) {
+            console.warn('⚠️ Backend not available, falling back to localStorage:', error.message);
             this.backendAvailable = false;
         }
     }
     
     showSignInModal() {
-        document.getElementById('signInModal').style.display = 'block';
+        const modal = document.getElementById('signInModal');
+        if (modal) {
+            modal.style.display = 'block';
+        }
     }
     
     showSignUpModal() {
-        document.getElementById('signUpModal').style.display = 'block';
+        const modal = document.getElementById('signUpModal');
+        if (modal) {
+            modal.style.display = 'block';
+        }
     }
     
     showUserMenu() {
-        document.getElementById('userMenuModal').style.display = 'block';
-        this.populateUserMenu();
+        const modal = document.getElementById('userMenuModal');
+        if (modal) {
+            modal.style.display = 'block';
+            this.populateUserMenu();
+        }
     }
     
     hideModals() {
@@ -282,29 +381,61 @@ class BackendUserAuth {
     }
     
     showMainApp() {
-        document.getElementById('authGuard').style.display = 'none';
-        document.getElementById('mainApp').style.display = 'block';
+        const authGuard = document.getElementById('authGuard');
+        const mainApp = document.getElementById('mainApp');
+        if (authGuard) authGuard.style.display = 'none';
+        if (mainApp) mainApp.style.display = 'block';
         this.showUserProfile();
     }
     
     showAuthGuard() {
-        document.getElementById('authGuard').style.display = 'flex';
-        document.getElementById('mainApp').style.display = 'none';
+        const authGuard = document.getElementById('authGuard');
+        const mainApp = document.getElementById('mainApp');
+        if (authGuard) authGuard.style.display = 'flex';
+        if (mainApp) mainApp.style.display = 'none';
     }
     
     showUserProfile() {
-        document.getElementById('userNotSignedIn').style.display = 'none';
-        document.getElementById('userSignedIn').style.display = 'flex';
+        if (!this.currentUser) {
+            console.warn('No current user data available');
+            return;
+        }
         
-        document.getElementById('userName').textContent = this.currentUser.name;
-        document.getElementById('userStreak').textContent = `🔥 ${this.currentUser.streak} day streak`;
+        const userNotSignedIn = document.getElementById('userNotSignedIn');
+        const userSignedIn = document.getElementById('userSignedIn');
+        
+        if (userNotSignedIn) userNotSignedIn.style.display = 'none';
+        if (userSignedIn) userSignedIn.style.display = 'flex';
+        
+        // Safely update user name
+        const userNameEl = document.getElementById('userName');
+        if (userNameEl && this.currentUser.name) {
+            userNameEl.textContent = this.currentUser.name;
+        }
+        
+        // Safely update user streak
+        const userStreakEl = document.getElementById('userStreak');
+        if (userStreakEl) {
+            const streak = this.currentUser.streak || 0;
+            userStreakEl.textContent = `🔥 ${streak} day streak`;
+        }
         
         this.updateAvatarDisplay();
     }
     
     updateAvatarDisplay() {
+        if (!this.currentUser || !this.currentUser.name) {
+            console.warn('No current user data for avatar display');
+            return;
+        }
+        
         const avatar = document.getElementById('userAvatar');
         const initials = document.getElementById('userInitials');
+        
+        if (!avatar || !initials) {
+            console.warn('Avatar elements not found in DOM');
+            return;
+        }
         
         if (this.currentUser.avatar) {
             avatar.src = this.currentUser.avatar;
@@ -319,24 +450,45 @@ class BackendUserAuth {
     }
     
     populateUserMenu() {
-        document.getElementById('profileName').value = this.currentUser.name;
-        document.getElementById('profileEmail').value = this.currentUser.email;
-        document.getElementById('soundToggle').checked = this.currentUser.settings?.soundEnabled ?? true;
-        document.getElementById('notificationsToggle').checked = this.currentUser.settings?.notificationsEnabled ?? true;
+        if (!this.currentUser) {
+            console.warn('No current user data for menu population');
+            return;
+        }
+        
+        // Safely populate profile fields
+        const profileNameEl = document.getElementById('profileName');
+        const profileEmailEl = document.getElementById('profileEmail');
+        const soundToggleEl = document.getElementById('soundToggle');
+        const notificationsToggleEl = document.getElementById('notificationsToggle');
+        
+        if (profileNameEl && this.currentUser.name) {
+            profileNameEl.value = this.currentUser.name;
+        }
+        if (profileEmailEl && this.currentUser.email) {
+            profileEmailEl.value = this.currentUser.email;
+        }
+        if (soundToggleEl) {
+            soundToggleEl.checked = this.currentUser.settings?.soundEnabled ?? true;
+        }
+        if (notificationsToggleEl) {
+            notificationsToggleEl.checked = this.currentUser.settings?.notificationsEnabled ?? true;
+        }
         
         // Update large avatar
         const avatarLarge = document.getElementById('profileAvatarLarge');
         const initialsLarge = document.getElementById('profileInitialsLarge');
         
-        if (this.currentUser.avatar) {
-            avatarLarge.src = this.currentUser.avatar;
-            avatarLarge.style.display = 'block';
-            initialsLarge.style.display = 'none';
-        } else {
-            const userInitials = this.currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase();
-            initialsLarge.textContent = userInitials;
-            avatarLarge.style.display = 'none';
-            initialsLarge.style.display = 'flex';
+        if (avatarLarge && initialsLarge && this.currentUser.name) {
+            if (this.currentUser.avatar) {
+                avatarLarge.src = this.currentUser.avatar;
+                avatarLarge.style.display = 'block';
+                initialsLarge.style.display = 'none';
+            } else {
+                const userInitials = this.currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase();
+                initialsLarge.textContent = userInitials;
+                avatarLarge.style.display = 'none';
+                initialsLarge.style.display = 'flex';
+            }
         }
     }
     
@@ -350,9 +502,10 @@ class BackendUserAuth {
                 if (this.backendAvailable) {
                     this.api.updateProfile({ avatar: avatarData });
                 } else {
-                    localStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+                    // Store in both formats for compatibility
+                    sessionStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+                    sessionStorage.setItem('productivefire_user', JSON.stringify(this.currentUser));
                     this.users[this.currentUser.email] = this.currentUser;
-                    localStorage.setItem('taskTrackerUsers', JSON.stringify(this.users));
                 }
                 this.updateAvatarDisplay();
             };
@@ -363,17 +516,22 @@ class BackendUserAuth {
     saveUserSettings() {
         if (!this.currentUser) return;
         
+        const soundToggle = document.getElementById('soundToggle');
+        const notificationsToggle = document.getElementById('notificationsToggle');
+        
         this.currentUser.settings = {
-            soundEnabled: document.getElementById('soundToggle').checked,
-            notificationsEnabled: document.getElementById('notificationsToggle').checked
+            soundEnabled: soundToggle ? soundToggle.checked : true,
+            notificationsEnabled: notificationsToggle ? notificationsToggle.checked : true
         };
         
         if (this.backendAvailable) {
             this.api.updateProfile({ settings: this.currentUser.settings });
         } else {
-            localStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+            // Store in both formats for compatibility
+            sessionStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+            sessionStorage.setItem('productivefire_user', JSON.stringify(this.currentUser));
             this.users[this.currentUser.email] = this.currentUser;
-            localStorage.setItem('taskTrackerUsers', JSON.stringify(this.users));
+            // Note: Remove localStorage usage for users storage
         }
     }
     
@@ -399,6 +557,11 @@ class BackendUserAuth {
                 // Use backend
                 const response = await this.api.signup({ name, email, password });
                 this.currentUser = response.user;
+                
+                // Store user data in both formats for compatibility
+                sessionStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+                sessionStorage.setItem('productivefire_user', JSON.stringify(this.currentUser));
+                
                 this.showMainApp();
                 this.hideModals();
                 
@@ -427,15 +590,39 @@ class BackendUserAuth {
                 // Use backend
                 const response = await this.api.signin({ email, password });
                 this.currentUser = response.user;
-                this.showMainApp();
+                
+                // Ensure token is properly stored (api.signin should have done this, but let's be sure)
+                if (response.token) {
+                    sessionStorage.setItem('authToken', response.token);
+                    sessionStorage.setItem('productivefire_token', response.token);
+                    console.log('✅ Token stored successfully:', response.token.substring(0, 20) + '...');
+                }
+                
+                // Store user data in both formats for compatibility
+                sessionStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+                sessionStorage.setItem('productivefire_user', JSON.stringify(this.currentUser));
+                
+                console.log('✅ User data stored, redirecting to main app...');
+                
+                // Mark auth as complete to prevent conflicts
+                sessionStorage.setItem('auth_check_done', 'true');
+                sessionStorage.setItem('backend_signin_complete', 'true');
+                
+                // Hide modals first
                 this.hideModals();
                 
+                // Redirect to main app instead of trying to show it on auth page
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 100);
+                
+                // Delayed robot greeting for when app loads
                 setTimeout(() => {
                     if (robot) {
                         robot.say(`Welcome back, ${response.user.name}! Ready to be productive? 🎉`);
                         robot.celebrate();
                     }
-                }, 1000);
+                }, 2000);
             } else {
                 // Fallback to localStorage
                 await this.handleSignInLocalStorage(e);
@@ -468,8 +655,9 @@ class BackendUserAuth {
                 delete this.users[this.currentUser.email];
                 this.users[email] = this.currentUser;
                 
-                localStorage.setItem('taskTrackerUsers', JSON.stringify(this.users));
-                localStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+                // Store in both formats for compatibility
+                sessionStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+                sessionStorage.setItem('productivefire_user', JSON.stringify(this.currentUser));
             }
 
             this.showUserProfile();
@@ -485,20 +673,45 @@ class BackendUserAuth {
     }
 
     signOut() {
+        console.log('🚪 BackendUserAuth signOut called...');
+        
         if (this.backendAvailable) {
             this.api.signout();
         }
         
+        // Clear all user data from both storage formats
+        sessionStorage.removeItem('taskTrackerCurrentUser');
+        sessionStorage.removeItem('productivefire_user');
+        sessionStorage.removeItem('authToken');
+        sessionStorage.removeItem('productivefire_token');
+        
+        // Clear auth flags
+        sessionStorage.removeItem('auth_check_done');
+        sessionStorage.removeItem('backend_signin_complete');
+        sessionStorage.removeItem('auth_redirect_attempted');
+        sessionStorage.removeItem('redirect_in_progress');
+        
+        // Clean up localStorage as well for migration
         localStorage.removeItem('taskTrackerCurrentUser');
+        localStorage.removeItem('productivefire_user');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('productivefire_token');
+        
         this.currentUser = null;
         
+        console.log('✅ All user data cleared by BackendUserAuth, redirecting to home...');
+        
         this.hideModals();
-        this.showAuthGuard();
         
         if (robot) {
             robot.say('Thanks for being productive! See you soon! 👋');
             robot.setMood('sad');
         }
+        
+        // Ensure clean redirect without loops
+        setTimeout(() => {
+            window.location.href = 'home.html';
+        }, 100);
     }
 
     // Fallback localStorage methods
@@ -527,10 +740,12 @@ class BackendUserAuth {
         };
         
         this.users[email] = newUser;
-        localStorage.setItem('taskTrackerUsers', JSON.stringify(this.users));
+        // Note: Remove localStorage usage for users storage
         
         this.currentUser = newUser;
-        localStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+        // Store in both formats for compatibility
+        sessionStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+        sessionStorage.setItem('productivefire_user', JSON.stringify(this.currentUser));
         
         this.showMainApp();
         this.hideModals();
@@ -552,7 +767,9 @@ class BackendUserAuth {
             this.currentUser = user;
             this.currentUser.lastLogin = new Date().toISOString();
             this.updateStreak();
-            localStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+            // Store in both formats for compatibility
+            sessionStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+            sessionStorage.setItem('productivefire_user', JSON.stringify(this.currentUser));
             
             this.showMainApp();
             this.hideModals();
@@ -584,30 +801,125 @@ class BackendUserAuth {
     }
 
     async checkExistingLogin() {
-        const token = localStorage.getItem('authToken');
+        console.log('🔍 BackendUserAuth: Checking existing login...');
+        
+        // Check if this is right after a successful backend signin
+        if (sessionStorage.getItem('backend_signin_complete')) {
+            console.log('🚀 Backend signin just completed, skipping auth check');
+            sessionStorage.removeItem('backend_signin_complete');
+            return true;
+        }
+        
+        // Check sessionStorage first (more secure)
+        const token = sessionStorage.getItem('authToken') || 
+                     sessionStorage.getItem('productivefire_token') ||
+                     localStorage.getItem('authToken') ||
+                     localStorage.getItem('productivefire_token');
         
         if (token && this.backendAvailable) {
             try {
                 this.api.setToken(token);
                 const response = await this.api.getProfile();
                 this.currentUser = response.user;
+                
+                // Store user data in both formats for compatibility
+                sessionStorage.setItem('taskTrackerCurrentUser', JSON.stringify(this.currentUser));
+                sessionStorage.setItem('productivefire_user', JSON.stringify(this.currentUser));
+                
+                // Migrate token to sessionStorage if it was in localStorage
+                if (localStorage.getItem('authToken') && !sessionStorage.getItem('authToken')) {
+                    sessionStorage.setItem('authToken', token);
+                    localStorage.removeItem('authToken');
+                }
+                if (localStorage.getItem('productivefire_token') && !sessionStorage.getItem('productivefire_token')) {
+                    sessionStorage.setItem('productivefire_token', token);
+                    localStorage.removeItem('productivefire_token');
+                }
+                
                 this.showMainApp();
                 this.updateUserStats();
-                return;
+                console.log('✅ User authenticated via backend token');
+                return true; // Important: return true to indicate successful authentication
             } catch (error) {
                 console.warn('Token validation failed:', error);
+                // Clear invalid tokens but keep user data for fallback
+                sessionStorage.removeItem('authToken');
+                sessionStorage.removeItem('productivefire_token');
                 localStorage.removeItem('authToken');
+                localStorage.removeItem('productivefire_token');
+                // Don't return here - fall through to check local user data
             }
         }
         
-        // Fallback to localStorage
-        const savedUser = localStorage.getItem('taskTrackerCurrentUser');
+        // Check if we have user data stored locally (multiple formats)
+        const savedUser = sessionStorage.getItem('taskTrackerCurrentUser') || 
+                         sessionStorage.getItem('productivefire_user') ||
+                         localStorage.getItem('taskTrackerCurrentUser') ||
+                         localStorage.getItem('productivefire_user');
+                         
         if (savedUser) {
-            this.currentUser = JSON.parse(savedUser);
-            this.showMainApp();
-            this.updateUserStats();
+            try {
+                this.currentUser = JSON.parse(savedUser);
+                
+                // Migrate user data to sessionStorage if it was in localStorage
+                if (localStorage.getItem('taskTrackerCurrentUser') && !sessionStorage.getItem('taskTrackerCurrentUser')) {
+                    sessionStorage.setItem('taskTrackerCurrentUser', savedUser);
+                    localStorage.removeItem('taskTrackerCurrentUser');
+                }
+                if (localStorage.getItem('productivefire_user') && !sessionStorage.getItem('productivefire_user')) {
+                    sessionStorage.setItem('productivefire_user', savedUser);
+                    localStorage.removeItem('productivefire_user');
+                }
+                
+                this.showMainApp();
+                this.updateUserStats();
+                console.log('✅ User loaded from storage:', this.currentUser.name);
+                return true; // Important: return true to indicate successful authentication
+            } catch (error) {
+                console.error('Error parsing stored user data:', error);
+                this.handleNoAuthentication();
+            }
         } else {
+            console.warn('⚠️ No authentication data found');
+            this.handleNoAuthentication();
+        }
+    }
+    
+    handleNoAuthentication() {
+        // Check if auth is already in progress or complete
+        if (sessionStorage.getItem('backend_signin_complete') || 
+            sessionStorage.getItem('auth_check_done') || 
+            this.currentUser) {
+            console.log('🚫 Auth already in progress or complete, skipping handleNoAuthentication');
+            return;
+        }
+        
+        // Prevent multiple redirects
+        if (sessionStorage.getItem('auth_redirect_attempted')) {
+            console.log('🚫 Auth redirect already attempted, skipping');
+            return;
+        }
+        
+        // Check if we're on the main app page (index.html) vs auth page (home.html)
+        const hasAuthGuard = document.getElementById('authGuard');
+        const mainApp = document.getElementById('mainApp');
+        
+        if (hasAuthGuard) {
+            // We're on home.html - show auth guard
             this.showAuthGuard();
+        } else if (mainApp) {
+            // We're on index.html - redirect to home since user isn't authenticated
+            console.log('🔄 No auth on main app page, redirecting to home...');
+            sessionStorage.setItem('auth_redirect_attempted', 'true');
+            
+            if (!sessionStorage.getItem('redirect_in_progress')) {
+                sessionStorage.setItem('redirect_in_progress', 'true');
+                setTimeout(() => {
+                    sessionStorage.removeItem('redirect_in_progress');
+                    sessionStorage.removeItem('auth_redirect_attempted');
+                    window.location.href = 'home.html';
+                }, 500);
+            }
         }
     }
 
@@ -637,64 +949,168 @@ class BackendUserAuth {
     }
 
     showMainApp() {
-        document.getElementById('authGuard').style.display = 'none';
-        document.getElementById('mainApp').style.display = 'flex';
+        const authGuard = document.getElementById('authGuard');
+        const mainApp = document.getElementById('mainApp');
+        if (authGuard) authGuard.style.display = 'none';
+        if (mainApp) mainApp.style.display = 'flex';
         this.updateUserStats();
         this.loadTasks();
     }
 
     showAuthGuard() {
-        document.getElementById('authGuard').style.display = 'flex';
-        document.getElementById('mainApp').style.display = 'none';
+        const authGuard = document.getElementById('authGuard');
+        const mainApp = document.getElementById('mainApp');
+        if (authGuard) authGuard.style.display = 'flex';
+        if (mainApp) mainApp.style.display = 'none';
     }
 
     hideModals() {
-        document.getElementById('signInModal').style.display = 'none';
-        document.getElementById('signUpModal').style.display = 'none';
-        document.getElementById('userModal').style.display = 'none';
+        // Safely hide all possible modals
+        const modalIds = ['signInModal', 'signUpModal', 'userModal', 'userMenuModal'];
+        modalIds.forEach(id => {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        });
+        
+        // Also hide any modal with the modal class
+        document.querySelectorAll('.modal').forEach(modal => {
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        });
     }
 
     showUserProfile() {
-        if (this.currentUser) {
-            document.getElementById('profileName').value = this.currentUser.name;
-            document.getElementById('profileEmail').value = this.currentUser.email;
-            document.getElementById('modalUserName').textContent = this.currentUser.name;
-            document.getElementById('modalUserEmail').textContent = this.currentUser.email;
-            document.getElementById('joinDate').textContent = new Date(this.currentUser.joinDate).toLocaleDateString();
-            document.getElementById('userStreak').textContent = this.currentUser.streak || 1;
+        if (!this.currentUser) {
+            console.warn('No current user data available');
+            return;
+        }
+        
+        // Safely populate profile fields only if they exist
+        const profileNameEl = document.getElementById('profileName');
+        if (profileNameEl && this.currentUser.name) {
+            profileNameEl.value = this.currentUser.name;
+        }
+        
+        const profileEmailEl = document.getElementById('profileEmail');
+        if (profileEmailEl && this.currentUser.email) {
+            profileEmailEl.value = this.currentUser.email;
+        }
+        
+        const modalUserNameEl = document.getElementById('modalUserName');
+        if (modalUserNameEl && this.currentUser.name) {
+            modalUserNameEl.textContent = this.currentUser.name;
+        }
+        
+        const modalUserEmailEl = document.getElementById('modalUserEmail');
+        if (modalUserEmailEl && this.currentUser.email) {
+            modalUserEmailEl.textContent = this.currentUser.email;
+        }
+        
+        const joinDateEl = document.getElementById('joinDate');
+        if (joinDateEl && this.currentUser.joinDate) {
+            joinDateEl.textContent = new Date(this.currentUser.joinDate).toLocaleDateString();
+        }
+        
+        const userStreakEl = document.getElementById('userStreak');
+        if (userStreakEl) {
+            userStreakEl.textContent = this.currentUser.streak || 1;
         }
     }
 
     updateUserStats() {
-        if (this.currentUser) {
-            document.getElementById('userName').textContent = this.currentUser.name;
-            const tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
-            const completedTasks = tasks.filter(task => task.completed).length;
-            document.getElementById('tasksCompleted').textContent = completedTasks;
-            document.getElementById('currentStreak').textContent = this.currentUser.streak || 1;
+        if (!this.currentUser) {
+            console.warn('No current user for stats update');
+            return;
         }
+        
+        // Safely update user name
+        const userNameEl = document.getElementById('userName');
+        if (userNameEl && this.currentUser.name) {
+            userNameEl.textContent = this.currentUser.name;
+        }
+        
+        // Load tasks for stats calculation
+        const tasks = JSON.parse(sessionStorage.getItem('tasks') || localStorage.getItem('tasks') || '[]');
+        const completedTasks = tasks.filter(task => task.completed).length;
+        
+        // Safely update tasks completed
+        const tasksCompletedEl = document.getElementById('tasksCompleted');
+        if (tasksCompletedEl) {
+            tasksCompletedEl.textContent = completedTasks;
+        }
+        
+        // Safely update current streak
+        const currentStreakEl = document.getElementById('currentStreak');
+        if (currentStreakEl) {
+            currentStreakEl.textContent = this.currentUser.streak || 1;
+        }
+        
+        console.log('📊 User stats updated:', { 
+            name: this.currentUser.name, 
+            completedTasks, 
+            streak: this.currentUser.streak || 1 
+        });
     }
 
     async loadTasks() {
+        // Prevent multiple simultaneous task loads
+        if (this.loadingTasks) {
+            console.log('⏳ Tasks already loading, skipping...');
+            return;
+        }
+        
+        this.loadingTasks = true;
+        
         try {
             if (this.backendAvailable) {
                 const response = await this.api.getTasks();
                 const tasks = response.tasks || [];
                 
-                // Sync with localStorage for offline functionality
-                localStorage.setItem('tasks', JSON.stringify(tasks));
+                // Sync with sessionStorage for current session functionality
+                sessionStorage.setItem('tasks', JSON.stringify(tasks));
                 
                 // Dispatch event to update UI
                 window.dispatchEvent(new CustomEvent('tasksLoaded', { detail: tasks }));
+                console.log('✅ Tasks loaded from backend:', tasks.length);
             } else {
-                // Load from localStorage
-                const tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+                // Load from sessionStorage first, then fallback to localStorage if needed
+                let tasks = [];
+                const sessionTasks = sessionStorage.getItem('tasks');
+                const localTasks = localStorage.getItem('tasks');
+                
+                if (sessionTasks) {
+                    tasks = JSON.parse(sessionTasks);
+                } else if (localTasks) {
+                    // Migrate from localStorage to sessionStorage
+                    tasks = JSON.parse(localTasks);
+                    sessionStorage.setItem('tasks', JSON.stringify(tasks));
+                    localStorage.removeItem('tasks');
+                }
+                
                 window.dispatchEvent(new CustomEvent('tasksLoaded', { detail: tasks }));
+                console.log('✅ Tasks loaded from storage:', tasks.length);
             }
         } catch (error) {
-            console.warn('Failed to load tasks from backend, using localStorage:', error);
-            const tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+            console.warn('Failed to load tasks from backend, using local storage:', error);
+            let tasks = [];
+            const sessionTasks = sessionStorage.getItem('tasks');
+            const localTasks = localStorage.getItem('tasks');
+            
+            if (sessionTasks) {
+                tasks = JSON.parse(sessionTasks);
+            } else if (localTasks) {
+                tasks = JSON.parse(localTasks);
+                sessionStorage.setItem('tasks', JSON.stringify(tasks));
+                localStorage.removeItem('tasks');
+            }
+            
             window.dispatchEvent(new CustomEvent('tasksLoaded', { detail: tasks }));
+            console.log('✅ Tasks loaded from fallback storage:', tasks.length);
+        } finally {
+            this.loadingTasks = false;
         }
     }
 }

@@ -790,14 +790,27 @@ app.post('/api/auth/signin', authLimiter, validateSignin, async (req, res) => {
 });
 
 // Get user profile
-app.get('/api/user/profile', authenticateToken, (req, res) => {
+app.get('/api/user/profile', authenticateToken, async (req, res) => {
     try {
-        const user = Object.values(users).find(u => u.id === req.user.userId);
+        let user;
+        if (isMongoConnected()) {
+            user = await User.findById(req.user.userId).select('-password');
+        } else {
+            // Search in-memory users - first try by userId, then by email
+            user = Object.values(users).find(u => u.id === req.user.userId);
+            if (!user && req.user.email) {
+                user = users[req.user.email];
+            }
+        }
+
         if (!user) {
+            console.log('User not found - userId:', req.user.userId, 'email:', req.user.email);
+            console.log('Available users:', Object.keys(users));
             return res.status(404).json({ error: 'User not found' });
         }
 
-        const { password: _, ...userWithoutPassword } = user;
+        // Remove password and format response
+        const { password: _, ...userWithoutPassword } = user.toObject ? user.toObject() : user;
         res.json({ user: userWithoutPassword });
     } catch (error) {
         console.error('Profile error:', error);
@@ -809,14 +822,24 @@ app.get('/api/user/profile', authenticateToken, (req, res) => {
 app.put('/api/user/profile', authenticateToken, [
     body('name').optional().trim().isLength({ min: 2 }).escape(),
     body('avatar').optional().isString()
-], (req, res) => {
+], async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({ errors: errors.array() });
         }
 
-        const user = Object.values(users).find(u => u.id === req.user.userId);
+        let user;
+        if (isMongoConnected()) {
+            user = await User.findById(req.user.userId);
+        } else {
+            // Search in-memory users - first try by userId, then by email
+            user = Object.values(users).find(u => u.id === req.user.userId);
+            if (!user && req.user.email) {
+                user = users[req.user.email];
+            }
+        }
+
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
@@ -827,7 +850,14 @@ app.put('/api/user/profile', authenticateToken, [
         if (avatar !== undefined) user.avatar = avatar;
         if (settings) user.settings = { ...user.settings, ...settings };
 
-        const { password: _, ...userWithoutPassword } = user;
+        // Save changes
+        if (isMongoConnected()) {
+            await user.save();
+        } else if (req.user.email) {
+            users[req.user.email] = user;
+        }
+
+        const { password: _, ...userWithoutPassword } = user.toObject ? user.toObject() : user;
         res.json({ success: true, user: userWithoutPassword });
     } catch (error) {
         console.error('Update profile error:', error);
@@ -1079,6 +1109,7 @@ app.post('/api/auth/verify-signup', requireDatabaseConnection, authLimiter, [
         
         writeLog('DEBUG', 'Starting OTP verification', {
             email,
+            providedOtp: otp,
             mongoState: mongoose.connection.readyState,
             mongoHost: mongoose.connection.host
         });
@@ -1099,7 +1130,7 @@ app.post('/api/auth/verify-signup', requireDatabaseConnection, authLimiter, [
             writeLog('WARN', 'Failed to cleanup expired OTPs', { error: cleanupError.message });
         }
         
-        // Find valid OTP with more flexible matching
+        // Find valid OTP - ensure exact string comparison
         try {
             const otpQuery = { 
                 email, 
@@ -1107,46 +1138,59 @@ app.post('/api/auth/verify-signup', requireDatabaseConnection, authLimiter, [
                 expiresAt: { $gt: now }
             };
             
-            // Try exact match first
-            otpDoc = await Otp.findOne({ 
-                ...otpQuery, 
-                otp: otp.toString().trim()
+            // Get all OTPs for this email to debug
+            const allOtps = await Otp.find({ email, type: 'signup' });
+            writeLog('DEBUG', 'Found OTPs for email', { 
+                email,
+                count: allOtps.length,
+                otps: allOtps.map(o => ({
+                    id: o._id,
+                    otp: o.otp,
+                    expired: o.expiresAt < now,
+                    createdAt: o.createdAt,
+                    expiresAt: o.expiresAt
+                }))
             });
             
-            // If no exact match, try case-insensitive comparison
-            if (!otpDoc) {
-                const allOtps = await Otp.find(otpQuery);
-                otpDoc = allOtps.find(doc => 
-                    doc.otp.toString().trim().toLowerCase() === otp.toString().trim().toLowerCase()
-                );
-            }
+            // Try exact match with string conversion
+            otpDoc = await Otp.findOne({ 
+                ...otpQuery, 
+                otp: otp.toString()
+            });
             
             if (!otpDoc) {
                 // Enhanced debugging for OTP verification failures
                 const anyOtp = await Otp.findOne({ email, type: 'signup' });
                 const debugInfo = {
                     email,
-                    provided: otp.toString().trim(),
-                    providedLength: otp.toString().trim().length
+                    provided: otp.toString(),
+                    providedLength: otp.toString().length,
+                    providedType: typeof otp
                 };
                 
                 if (anyOtp) {
                     debugInfo.stored = anyOtp.otp;
                     debugInfo.storedLength = anyOtp.otp.length;
+                    debugInfo.storedType = typeof anyOtp.otp;
                     debugInfo.expired = anyOtp.expiresAt < now;
                     debugInfo.timeDiff = Math.round((now - anyOtp.expiresAt) / 1000); // seconds
                     debugInfo.createdAt = anyOtp.createdAt;
                     debugInfo.expiresAt = anyOtp.expiresAt;
-                    debugInfo.exactMatch = anyOtp.otp === otp.toString().trim();
-                    debugInfo.caseInsensitiveMatch = anyOtp.otp.toLowerCase() === otp.toString().trim().toLowerCase();
+                    debugInfo.exactMatch = anyOtp.otp === otp.toString();
                     
-                    writeLog('WARN', 'OTP verification failed - details', debugInfo);
+                    writeLog('ERROR', 'OTP verification failed - mismatch', debugInfo);
+                    return res.status(400).json({ error: 'Invalid verification code. Please check the code and try again.' });
                 } else {
-                    writeLog('WARN', 'No OTP found for email', debugInfo);
+                    writeLog('ERROR', 'No OTP found for email', debugInfo);
+                    return res.status(400).json({ error: 'No verification code found. Please request a new code.' });
                 }
-                
-                return res.status(400).json({ error: 'Invalid or expired verification code' });
             }
+            
+            writeLog('INFO', 'OTP verification successful', { 
+                email, 
+                otpId: otpDoc._id,
+                timeSinceCreated: Math.round((now - otpDoc.createdAt) / 1000)
+            });
             
             writeLog('INFO', 'OTP verification successful', { 
                 email, 
