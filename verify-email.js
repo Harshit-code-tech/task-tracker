@@ -203,6 +203,22 @@ class EmailVerificationManager {
             if (error.message.includes('Invalid or expired')) {
                 AuthUtils.showError('otpError', 'Invalid or expired verification code');
                 this.clearOtpInputs();
+            } else if (error.message.includes('expired')) {
+                AuthUtils.showError('otpError', 'Verification code has expired. Please request a new code.');
+                this.clearOtpInputs();
+                // Auto-focus on resend button
+                setTimeout(() => {
+                    const resendBtn = document.getElementById('resendOtp');
+                    if (resendBtn) resendBtn.focus();
+                }, 1000);
+            } else if (error.message.includes('No verification code found')) {
+                AuthUtils.showError('otpError', 'No verification code found. Please request a new code.');
+                this.clearOtpInputs();
+                // Auto-focus on resend button
+                setTimeout(() => {
+                    const resendBtn = document.getElementById('resendOtp');
+                    if (resendBtn) resendBtn.focus();
+                }, 1000);
             } else if (error.message.includes('Too many requests')) {
                 AuthUtils.showError('otpError', 'Too many attempts. Please wait 15 minutes before trying again.');
                 // Disable the button temporarily
@@ -234,7 +250,10 @@ class EmailVerificationManager {
         try {
             const response = await AuthUtils.makeRequest('/auth/send-signup-otp', {
                 method: 'POST',
-                body: JSON.stringify({ email: this.userEmail })
+                body: JSON.stringify({ 
+                    email: this.userEmail,
+                    isResend: true  // Indicate this is a resend request
+                })
             });
             
             if (response.success) {
@@ -245,7 +264,14 @@ class EmailVerificationManager {
             }
         } catch (error) {
             console.error('Resend OTP error:', error);
-            toast.show('error', 'Failed to resend code. Please try again.');
+            
+            // Handle specific error messages
+            if (error.message.includes('User already exists')) {
+                // This shouldn't happen with the updated backend, but handle gracefully
+                toast.show('error', 'Account verification in progress. Please check your email for the latest code.');
+            } else {
+                toast.show('error', error.message || 'Failed to resend code. Please try again.');
+            }
         } finally {
             AuthUtils.hideLoading('resendCode');
         }

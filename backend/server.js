@@ -1021,12 +1021,18 @@ app.post('/api/auth/send-signup-otp', authLimiter, [
         }
 
         const { email } = req.body;
+        const { isResend } = req.body; // Allow resend parameter
 
-        // Check if user already exists
+        // Check if user already exists and is verified
         if (isMongoConnected()) {
             const existingUser = await User.findOne({ email });
-            if (existingUser) {
+            if (existingUser && existingUser.emailVerified) {
                 return res.status(400).json({ error: 'User already exists with this email' });
+            }
+            
+            // If user exists but not verified, we can resend OTP
+            if (existingUser && !existingUser.emailVerified) {
+                writeLog('INFO', 'Resending OTP to unverified user', { email });
             }
         } else {
             if (users[email]) {
@@ -1152,19 +1158,40 @@ app.post('/api/auth/verify-signup', requireDatabaseConnection, authLimiter, [
                 }))
             });
             
-            // Try exact match with string conversion
+            // Try exact match with string conversion and trim whitespace
+            const cleanOtp = otp.toString().trim();
             otpDoc = await Otp.findOne({ 
                 ...otpQuery, 
-                otp: otp.toString()
+                otp: cleanOtp
             });
+            
+            // If not found, try without expiry check to see if it's just expired
+            if (!otpDoc) {
+                const expiredOtp = await Otp.findOne({ 
+                    email, 
+                    type: 'signup',
+                    otp: cleanOtp
+                });
+                
+                if (expiredOtp) {
+                    writeLog('ERROR', 'OTP expired', { 
+                        email, 
+                        providedOtp: cleanOtp,
+                        expiredAt: expiredOtp.expiresAt,
+                        currentTime: now,
+                        timeDiff: Math.round((now - expiredOtp.expiresAt) / 1000)
+                    });
+                    return res.status(400).json({ error: 'Verification code has expired. Please request a new code.' });
+                }
+            }
             
             if (!otpDoc) {
                 // Enhanced debugging for OTP verification failures
                 const anyOtp = await Otp.findOne({ email, type: 'signup' });
                 const debugInfo = {
                     email,
-                    provided: otp.toString(),
-                    providedLength: otp.toString().length,
+                    provided: cleanOtp,
+                    providedLength: cleanOtp.length,
                     providedType: typeof otp
                 };
                 
@@ -1176,7 +1203,8 @@ app.post('/api/auth/verify-signup', requireDatabaseConnection, authLimiter, [
                     debugInfo.timeDiff = Math.round((now - anyOtp.expiresAt) / 1000); // seconds
                     debugInfo.createdAt = anyOtp.createdAt;
                     debugInfo.expiresAt = anyOtp.expiresAt;
-                    debugInfo.exactMatch = anyOtp.otp === otp.toString();
+                    debugInfo.exactMatch = anyOtp.otp === cleanOtp;
+                    debugInfo.trimmedMatch = anyOtp.otp.trim() === cleanOtp;
                     
                     writeLog('ERROR', 'OTP verification failed - mismatch', debugInfo);
                     return res.status(400).json({ error: 'Invalid verification code. Please check the code and try again.' });
@@ -1212,47 +1240,83 @@ app.post('/api/auth/verify-signup', requireDatabaseConnection, authLimiter, [
         const saltRounds = 12;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-        // Create user
-        const userData = {
-            name,
-            email,
-            password: hashedPassword,
-            avatar: null,
-            joinDate: new Date(),
-            lastLogin: new Date(),
-            streak: 1,
-            emailVerified: true,
-            settings: {
-                soundEnabled: true,
-                notificationsEnabled: true
-            }
-        };
-
+        // Check if user already exists (might be unverified)
         let user;
         try {
-            // Save to MongoDB
-            user = new User(userData);
-            await user.save();
+            const existingUser = await User.findOne({ email });
             
-            // Create initial progress
-            const progress = new Progress({
-                userId: user._id.toString(),
-                totalTasks: 0,
-                completedTasks: 0,
-                dsaProblems: 0,
-                streak: 1
-            });
-            await progress.save();
+            if (existingUser && existingUser.emailVerified) {
+                // User is already verified, shouldn't happen but handle it
+                return res.status(400).json({ 
+                    error: 'Account already exists and is verified. Please login instead.' 
+                });
+            }
+            
+            if (existingUser && !existingUser.emailVerified) {
+                // Update existing unverified user
+                user = await User.findOneAndUpdate(
+                    { email },
+                    {
+                        name,
+                        password: hashedPassword,
+                        emailVerified: true,
+                        lastLogin: new Date(),
+                        settings: {
+                            soundEnabled: true,
+                            notificationsEnabled: true
+                        }
+                    },
+                    { new: true }
+                );
+                
+                writeLog('INFO', 'Updated existing unverified user', { 
+                    userId: user._id.toString(), 
+                    email: user.email 
+                });
+            } else {
+                // Create new user
+                const userData = {
+                    name,
+                    email,
+                    password: hashedPassword,
+                    avatar: null,
+                    joinDate: new Date(),
+                    lastLogin: new Date(),
+                    streak: 1,
+                    emailVerified: true,
+                    settings: {
+                        soundEnabled: true,
+                        notificationsEnabled: true
+                    }
+                };
+
+                user = new User(userData);
+                await user.save();
+                
+                writeLog('INFO', 'User created successfully', { 
+                    userId: user._id.toString(), 
+                    email: user.email 
+                });
+            }
+            
+            // Create or update progress
+            const existingProgress = await Progress.findOne({ userId: user._id.toString() });
+            if (!existingProgress) {
+                const progress = new Progress({
+                    userId: user._id.toString(),
+                    totalTasks: 0,
+                    completedTasks: 0,
+                    dsaProblems: 0,
+                    streak: 1
+                });
+                await progress.save();
+            }
             
             // Delete used OTP
             await Otp.deleteOne({ _id: otpDoc._id });
             
-            writeLog('INFO', 'User created successfully', { 
-                userId: user._id.toString(), 
-                email: user.email 
-            });
         } catch (dbError) {
-            writeLog('ERROR', 'Database error during user creation', { 
+            writeLog('ERROR', 'Database error during user creation/update', { 
                 error: dbError.message,
                 code: dbError.code,
                 email 
