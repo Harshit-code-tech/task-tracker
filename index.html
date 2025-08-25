@@ -103,6 +103,10 @@
                 <i class="fas fa-graduation-cap"></i>
                 Learning Hub
             </button>
+            <button class="nav-tab" data-tab="roadmap">
+                <i class="fas fa-route"></i>
+                Learning Roadmap
+            </button>
             <button class="nav-tab" data-tab="analytics">
                 <i class="fas fa-chart-line"></i>
                 Analytics
@@ -249,6 +253,98 @@
             </div>
         </div>
 
+        <!-- Learning Roadmap Tab -->
+        <div class="tab-content" id="roadmap">
+            <div class="section-header">
+                <h2 class="gradient-text">
+                    <i class="fas fa-route"></i>
+                    6-Month Learning Roadmap
+                </h2>
+                <p>Your comprehensive journey to becoming a Full-Stack + AI Engineer</p>
+            </div>
+
+            <!-- Roadmap Progress Overview -->
+            <div class="roadmap-overview">
+                <div class="progress-summary">
+                    <div class="summary-card">
+                        <div class="summary-icon">📅</div>
+                        <div class="summary-content">
+                            <div class="summary-title">Current Month</div>
+                            <div class="summary-value" id="currentMonth">Month 1</div>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-icon">🎯</div>
+                        <div class="summary-content">
+                            <div class="summary-title">Week Progress</div>
+                            <div class="summary-value" id="weekProgress">Week 1 of 4</div>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-icon">✅</div>
+                        <div class="summary-content">
+                            <div class="summary-title">Completed</div>
+                            <div class="summary-value" id="roadmapCompleted">0%</div>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-icon">🔥</div>
+                        <div class="summary-content">
+                            <div class="summary-title">Learning Streak</div>
+                            <div class="summary-value" id="learningStreak">0 days</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monthly Timeline -->
+            <div class="roadmap-timeline">
+                <div class="timeline-header">
+                    <h3>Learning Timeline</h3>
+                    <div class="timeline-controls">
+                        <button class="timeline-btn" onclick="changeRoadmapMonth(-1)">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <span id="timelineMonth">Month 1</span>
+                        <button class="timeline-btn" onclick="changeRoadmapMonth(1)">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="timeline-content" id="timelineContent">
+                    <!-- Timeline content will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="roadmap-actions">
+                <h3>Quick Actions</h3>
+                <div class="action-buttons">
+                    <button class="action-btn primary" onclick="addWeeklyGoals()">
+                        <i class="fas fa-plus"></i>
+                        Add This Week's Goals
+                    </button>
+                    <button class="action-btn secondary" onclick="markWeekComplete()">
+                        <i class="fas fa-check"></i>
+                        Mark Week Complete
+                    </button>
+                    <button class="action-btn tertiary" onclick="viewProjectIdeas()">
+                        <i class="fas fa-lightbulb"></i>
+                        View Project Ideas
+                    </button>
+                </div>
+            </div>
+
+            <!-- Skills Progress -->
+            <div class="skills-progress">
+                <h3>Skills Development</h3>
+                <div class="skills-grid" id="skillsGrid">
+                    <!-- Skills will be dynamically generated -->
+                </div>
+            </div>
+        </div>
+
         <!-- Analytics Tab -->
         <div class="tab-content" id="analytics">
             <div class="section-header">
@@ -390,7 +486,14 @@
                     
                     <div class="form-group">
                         <label for="taskCategory">Category</label>
-                        <input type="text" id="taskCategory" placeholder="e.g., Work, Study, Personal">
+                        <select id="taskCategory">
+                            <option value="general">General</option>
+                            <option value="work">Work</option>
+                            <option value="study">Study</option>
+                            <option value="personal">Personal</option>
+                            <option value="roadmap">Learning Roadmap</option>
+                            <option value="project">Project</option>
+                        </select>
                     </div>
                 </form>
             </div>

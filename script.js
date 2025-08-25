@@ -56,8 +56,253 @@ let neetcodeProgress = userDataManager.getUserData('neetcodeProgress', {});
 let dsaProgress = userDataManager.getUserData('dsaProgress', {});
 let algorithmsProgress = userDataManager.getUserData('algorithmsProgress', {});
 let personalCourses = userDataManager.getUserData('personalCourses', []);
+let roadmapProgress = userDataManager.getUserData('roadmapProgress', {
+    currentMonth: 1,
+    currentWeek: 1,
+    completedWeeks: [],
+    skillsProgress: {},
+    projectsCompleted: [],
+    learningStreak: 0,
+    lastActiveDate: null
+});
 let currentEditingTask = null;
 let currentEditingCourse = null;
+
+// Roadmap Data Structure
+const roadmapData = {
+    months: [
+        {
+            month: 1,
+            title: "DSA + Web Basics",
+            description: "Foundation building with algorithms and web technologies",
+            weeks: [
+                {
+                    week: 1,
+                    title: "Arrays & Web Fundamentals",
+                    topics: ["Arrays", "Strings", "HTML", "CSS", "Git"],
+                    goals: "Solve LeetCode Top 50 Easy problems, build basic portfolio website",
+                    skills: ["Data Structures", "Web Development", "Version Control"]
+                },
+                {
+                    week: 2,
+                    title: "Linked Lists & JavaScript",
+                    topics: ["Linked Lists", "Stacks", "Queues", "JavaScript ES6", "DOM"],
+                    goals: "Master linear data structures, build interactive JS portfolio",
+                    skills: ["Data Structures", "JavaScript", "DOM Manipulation"]
+                },
+                {
+                    week: 3,
+                    title: "Hashing & React Basics",
+                    topics: ["Hashing", "Sliding Window", "React Components", "Hooks"],
+                    goals: "Learn hash tables and React fundamentals, convert portfolio to React",
+                    skills: ["Algorithms", "React", "Component Design"]
+                },
+                {
+                    week: 4,
+                    title: "Trees & State Management",
+                    topics: ["Binary Trees", "BST", "Tree Traversal", "React Router", "Context API"],
+                    goals: "Master tree data structures, add routing and state management",
+                    skills: ["Tree Algorithms", "React Ecosystem", "State Management"]
+                }
+            ]
+        },
+        {
+            month: 2,
+            title: "Backend + Full-Stack Foundation",
+            description: "Building robust backend systems and full-stack applications",
+            weeks: [
+                {
+                    week: 5,
+                    title: "Graphs & Backend Basics",
+                    topics: ["Graph BFS", "Graph DFS", "Node.js/Django", "REST APIs"],
+                    goals: "Learn graph algorithms, build REST API for To-Do App",
+                    skills: ["Graph Algorithms", "Backend Development", "API Design"]
+                },
+                {
+                    week: 6,
+                    title: "Advanced Graphs & Databases",
+                    topics: ["Dijkstra", "Topological Sort", "PostgreSQL", "MongoDB", "JWT Auth"],
+                    goals: "Master graph algorithms, implement authentication system",
+                    skills: ["Advanced Algorithms", "Databases", "Authentication"]
+                },
+                {
+                    week: 7,
+                    title: "Recursion & Full-Stack Integration",
+                    topics: ["Recursion", "Backtracking", "Frontend-Backend Integration"],
+                    goals: "Connect React frontend with backend API, complete full-stack app",
+                    skills: ["Recursion", "Full-Stack Development", "System Integration"]
+                },
+                {
+                    week: 8,
+                    title: "Dynamic Programming & Deployment",
+                    topics: ["DP Basics", "Memoization", "Deployment", "Render/Vercel"],
+                    goals: "Learn DP fundamentals, deploy full-stack application",
+                    skills: ["Dynamic Programming", "DevOps", "Cloud Deployment"]
+                }
+            ]
+        },
+        {
+            month: 3,
+            title: "Major Full-Stack Project",
+            description: "Building a comprehensive full-stack application",
+            weeks: [
+                {
+                    week: 9,
+                    title: "Advanced DP & Project Planning",
+                    topics: ["Knapsack", "LIS", "Project Architecture", "Database Design"],
+                    goals: "Start Job Portal or E-Commerce project with auth and search features",
+                    skills: ["Advanced DP", "System Design", "Project Planning"]
+                },
+                {
+                    week: 10,
+                    title: "Binary Search & Payment Integration",
+                    topics: ["Binary Search on Answer", "Payment Gateway", "Admin Dashboard"],
+                    goals: "Implement payment systems and administrative features",
+                    skills: ["Search Algorithms", "Payment Processing", "Admin Systems"]
+                },
+                {
+                    week: 11,
+                    title: "Company Patterns & Project Completion",
+                    topics: ["Amazon Patterns", "Google Patterns", "Performance Optimization"],
+                    goals: "Finish and deploy major project with optimizations",
+                    skills: ["Interview Patterns", "Performance", "Production Deployment"]
+                },
+                {
+                    week: 12,
+                    title: "System Design & Testing",
+                    topics: ["Caching", "Load Balancing", "Testing", "Code Review"],
+                    goals: "Add testing, optimize APIs, write technical blog post",
+                    skills: ["System Design", "Testing", "Technical Writing"]
+                }
+            ]
+        },
+        {
+            month: 4,
+            title: "AI/ML Advanced + LLM",
+            description: "Diving into artificial intelligence and machine learning",
+            weeks: [
+                {
+                    week: 13,
+                    title: "AI Fundamentals & Chatbots",
+                    topics: ["Transformers", "Hugging Face", "LangChain", "OpenAI API"],
+                    goals: "Build AI Chatbot with context memory and conversation turns",
+                    skills: ["AI/ML", "NLP", "LLM Integration"]
+                },
+                {
+                    week: 14,
+                    title: "Model Fine-tuning & Resume AI",
+                    topics: ["Fine-tuning", "Text Classification", "Resume Analysis"],
+                    goals: "Create Resume Screening AI that ranks resumes by job description",
+                    skills: ["Model Training", "Classification", "Document Processing"]
+                },
+                {
+                    week: 15,
+                    title: "AI Deployment & Hosting",
+                    topics: ["Streamlit", "Gradio", "Hugging Face Spaces", "Model Serving"],
+                    goals: "Deploy AI Chatbot and Resume Screener, write AI blog post",
+                    skills: ["AI Deployment", "MLOps", "Technical Communication"]
+                },
+                {
+                    week: 16,
+                    title: "MLOps & CI/CD",
+                    topics: ["Docker for ML", "GitHub Actions", "Model Versioning"],
+                    goals: "Implement CI/CD pipeline for AI projects",
+                    skills: ["MLOps", "DevOps", "Automation"]
+                }
+            ]
+        },
+        {
+            month: 5,
+            title: "Advanced Projects + System Design",
+            description: "Building complex systems and mastering system design",
+            weeks: [
+                {
+                    week: 17,
+                    title: "Real-time Systems",
+                    topics: ["WebSockets", "Real-time Chat", "Typing Indicators", "Online Status"],
+                    goals: "Build real-time chat application with advanced features",
+                    skills: ["Real-time Systems", "WebSockets", "Concurrency"]
+                },
+                {
+                    week: 18,
+                    title: "Scalability & Analytics",
+                    topics: ["URL Shortener", "Rate Limiting", "Caching", "Analytics"],
+                    goals: "Create URL shortener with analytics and performance optimization",
+                    skills: ["Scalability", "Performance", "Analytics"]
+                },
+                {
+                    week: 19,
+                    title: "AI Image Generation",
+                    topics: ["Stable Diffusion", "Image Processing", "AI Art"],
+                    goals: "Deploy AI Image Generator using Stable Diffusion",
+                    skills: ["Computer Vision", "Generative AI", "Image Processing"]
+                },
+                {
+                    week: 20,
+                    title: "System Design Mastery",
+                    topics: ["CAP Theorem", "Distributed Systems", "Microservices"],
+                    goals: "Master system design concepts, practice mock interviews",
+                    skills: ["System Design", "Distributed Systems", "Architecture"]
+                }
+            ]
+        },
+        {
+            month: 6,
+            title: "Placement Prep + Networking",
+            description: "Final preparation for job interviews and career advancement",
+            weeks: [
+                {
+                    week: 21,
+                    title: "DSA Revision & Mock Interviews",
+                    topics: ["Trees Review", "Graphs Review", "DP Review", "Mock Interviews"],
+                    goals: "Comprehensive DSA revision, start regular mock interviews",
+                    skills: ["Interview Prep", "Problem Solving", "Communication"]
+                },
+                {
+                    week: 22,
+                    title: "Behavioral Prep & Resume",
+                    topics: ["STAR Method", "Behavioral Questions", "Resume Optimization"],
+                    goals: "Master behavioral interviews, update resume with projects",
+                    skills: ["Soft Skills", "Personal Branding", "Professional Communication"]
+                },
+                {
+                    week: 23,
+                    title: "Job Applications & Networking",
+                    topics: ["Job Applications", "LinkedIn Optimization", "Networking"],
+                    goals: "Apply to companies, enhance LinkedIn presence, network actively",
+                    skills: ["Job Search", "Networking", "Personal Marketing"]
+                },
+                {
+                    week: 24,
+                    title: "Final Preparation",
+                    topics: ["System Design Review", "AI Concepts", "Final Projects"],
+                    goals: "Final review of all concepts, intensive mock interview practice",
+                    skills: ["Comprehensive Review", "Interview Excellence", "Confidence Building"]
+                }
+            ]
+        }
+    ],
+    skills: [
+        { name: "Data Structures & Algorithms", category: "DSA", totalTopics: 25 },
+        { name: "Web Development", category: "Frontend", totalTopics: 20 },
+        { name: "Backend Development", category: "Backend", totalTopics: 18 },
+        { name: "React Ecosystem", category: "Frontend", totalTopics: 15 },
+        { name: "AI/ML & LLM", category: "AI", totalTopics: 22 },
+        { name: "System Design", category: "Architecture", totalTopics: 16 },
+        { name: "DevOps & Deployment", category: "Infrastructure", totalTopics: 12 },
+        { name: "Interview Skills", category: "Career", totalTopics: 10 }
+    ],
+    projectIdeas: [
+        { title: "E-Commerce Platform", category: "Full-Stack", difficulty: "Advanced", tech: ["React", "Node.js", "MongoDB"] },
+        { title: "Job Portal", category: "Full-Stack", difficulty: "Advanced", tech: ["React", "Django", "PostgreSQL"] },
+        { title: "Real-Time Chat App", category: "Full-Stack", difficulty: "Intermediate", tech: ["React", "WebSocket", "Node.js"] },
+        { title: "AI Chatbot", category: "AI/ML", difficulty: "Advanced", tech: ["LangChain", "OpenAI", "Streamlit"] },
+        { title: "Resume Screening AI", category: "AI/ML", difficulty: "Intermediate", tech: ["NLP", "Classification", "Flask"] },
+        { title: "URL Shortener", category: "Backend", difficulty: "Intermediate", tech: ["Node.js", "Redis", "Analytics"] },
+        { title: "AI Image Generator", category: "AI/ML", difficulty: "Advanced", tech: ["Stable Diffusion", "Python"] },
+        { title: "Personal Finance Tracker", category: "Full-Stack", difficulty: "Intermediate", tech: ["React", "Charts", "AI"] }
+    ]
+};
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
@@ -173,6 +418,11 @@ function switchTab(tabName) {
     if (tabName === 'analytics') {
         updateAnalytics();
         renderWeeklyChart();
+    }
+    
+    // Initialize roadmap when switching to roadmap tab
+    if (tabName === 'roadmap') {
+        initializeRoadmap();
     }
 }
 
@@ -2298,4 +2548,320 @@ if (tasks.length === 0 && Object.keys(neetcodeProgress).length === 0 && Object.k
         }
     ];
     localStorage.setItem('personalCourses', JSON.stringify(personalCourses));
+}
+
+// ========================================
+// ROADMAP FUNCTIONALITY
+// ========================================
+
+// Initialize roadmap when tab is clicked
+function initializeRoadmap() {
+    updateRoadmapOverview();
+    renderTimeline();
+    renderSkillsProgress();
+    updateLearningStreak();
+}
+
+// Update roadmap overview statistics
+function updateRoadmapOverview() {
+    const totalWeeks = roadmapData.months.reduce((total, month) => total + month.weeks.length, 0);
+    const completedWeeks = roadmapProgress.completedWeeks.length;
+    const completionPercentage = Math.round((completedWeeks / totalWeeks) * 100);
+    
+    // Update current month and week
+    document.getElementById('currentMonth').textContent = `Month ${roadmapProgress.currentMonth}`;
+    document.getElementById('weekProgress').textContent = `Week ${roadmapProgress.currentWeek} of 4`;
+    document.getElementById('roadmapCompleted').textContent = `${completionPercentage}%`;
+    document.getElementById('learningStreak').textContent = `${roadmapProgress.learningStreak} days`;
+}
+
+// Render timeline for current month
+function renderTimeline() {
+    const currentMonth = roadmapData.months[roadmapProgress.currentMonth - 1];
+    if (!currentMonth) return;
+    
+    document.getElementById('timelineMonth').textContent = `Month ${currentMonth.month}: ${currentMonth.title}`;
+    
+    const timelineContent = document.getElementById('timelineContent');
+    timelineContent.innerHTML = `
+        <div class="month-timeline">
+            <div class="month-header">
+                <h4>${currentMonth.title}</h4>
+                <p>${currentMonth.description}</p>
+            </div>
+            ${currentMonth.weeks.map(week => renderWeekItem(week, currentMonth.month)).join('')}
+        </div>
+    `;
+}
+
+// Render individual week item
+function renderWeekItem(week, month) {
+    const weekId = `${month}-${week.week}`;
+    const isCompleted = roadmapProgress.completedWeeks.includes(weekId);
+    const isCurrent = roadmapProgress.currentMonth === month && roadmapProgress.currentWeek === week.week;
+    
+    let statusClass = 'upcoming';
+    let statusText = 'Upcoming';
+    
+    if (isCompleted) {
+        statusClass = 'completed';
+        statusText = 'Completed';
+    } else if (isCurrent) {
+        statusClass = 'current';
+        statusText = 'Current';
+    }
+    
+    return `
+        <div class="week-item ${isCompleted ? 'completed' : ''}" data-week="${weekId}">
+            <div class="week-header">
+                <div class="week-title">Week ${week.week}: ${week.title}</div>
+                <div class="week-status ${statusClass}">${statusText}</div>
+            </div>
+            <div class="week-content">
+                <div class="topic-list">
+                    ${week.topics.map(topic => `<span class="topic-tag">${topic}</span>`).join('')}
+                </div>
+                <div class="week-goals">
+                    <strong>Goals:</strong> ${week.goals}
+                </div>
+                <div class="week-skills">
+                    <strong>Skills:</strong> ${week.skills.join(', ')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Change roadmap month (navigation)
+function changeRoadmapMonth(direction) {
+    const newMonth = roadmapProgress.currentMonth + direction;
+    if (newMonth >= 1 && newMonth <= 6) {
+        roadmapProgress.currentMonth = newMonth;
+        saveRoadmapProgress();
+        renderTimeline();
+    }
+}
+
+// Add weekly goals as tasks
+function addWeeklyGoals() {
+    const currentMonth = roadmapData.months[roadmapProgress.currentMonth - 1];
+    if (!currentMonth) return;
+    
+    const currentWeek = currentMonth.weeks.find(w => w.week === roadmapProgress.currentWeek);
+    if (!currentWeek) return;
+    
+    // Create tasks based on current week's goals and topics
+    const weeklyTasks = [
+        {
+            id: Date.now() + Math.random(),
+            title: `Week ${currentWeek.week}: ${currentWeek.title}`,
+            description: currentWeek.goals,
+            category: 'roadmap',
+            priority: 'high',
+            dueDate: getEndOfWeek(),
+            completed: false,
+            createdAt: new Date().toISOString(),
+            roadmapWeek: `${roadmapProgress.currentMonth}-${roadmapProgress.currentWeek}`
+        }
+    ];
+    
+    // Add individual topic tasks
+    currentWeek.topics.forEach((topic, index) => {
+        weeklyTasks.push({
+            id: Date.now() + Math.random() + index,
+            title: `Study: ${topic}`,
+            description: `Learn and practice ${topic} concepts`,
+            category: 'roadmap',
+            priority: 'medium',
+            dueDate: getEndOfWeek(),
+            completed: false,
+            createdAt: new Date().toISOString(),
+            roadmapWeek: `${roadmapProgress.currentMonth}-${roadmapProgress.currentWeek}`
+        });
+    });
+    
+    // Add tasks to main tasks array
+    tasks.push(...weeklyTasks);
+    saveTasksData();
+    renderTasks();
+    
+    // Show success message
+    showNotification(`Added ${weeklyTasks.length} tasks for Week ${currentWeek.week}!`, 'success');
+    
+    // Switch to general tasks tab to see the new tasks
+    switchTab('general');
+}
+
+// Mark current week as complete
+function markWeekComplete() {
+    const weekId = `${roadmapProgress.currentMonth}-${roadmapProgress.currentWeek}`;
+    
+    if (!roadmapProgress.completedWeeks.includes(weekId)) {
+        roadmapProgress.completedWeeks.push(weekId);
+        
+        // Update learning streak
+        updateLearningStreak();
+        
+        // Move to next week
+        if (roadmapProgress.currentWeek < 4) {
+            roadmapProgress.currentWeek++;
+        } else if (roadmapProgress.currentMonth < 6) {
+            roadmapProgress.currentMonth++;
+            roadmapProgress.currentWeek = 1;
+        }
+        
+        saveRoadmapProgress();
+        updateRoadmapOverview();
+        renderTimeline();
+        renderSkillsProgress();
+        
+        showNotification('Week marked as complete! 🎉', 'success');
+        
+        // Celebrate with robot
+        if (robot) {
+            robot.celebrate(`Congratulations on completing Week ${roadmapProgress.currentWeek}! You're making great progress! 🚀`);
+        }
+    }
+}
+
+// View project ideas modal
+function viewProjectIdeas() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content project-ideas-modal">
+            <div class="modal-header">
+                <h3>15 High-Value Project Ideas</h3>
+                <button class="close-btn" onclick="this.closest('.modal').remove()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="projects-grid">
+                    ${roadmapData.projectIdeas.map(project => `
+                        <div class="project-card">
+                            <div class="project-header">
+                                <h4>${project.title}</h4>
+                                <span class="project-difficulty ${project.difficulty.toLowerCase()}">${project.difficulty}</span>
+                            </div>
+                            <div class="project-category">${project.category}</div>
+                            <div class="project-tech">
+                                ${project.tech.map(tech => `<span class="tech-tag">${tech}</span>`).join('')}
+                            </div>
+                            <button class="add-project-btn" onclick="addProjectAsTask('${project.title}', '${project.category}')">
+                                Add as Task
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+// Add project as task
+function addProjectAsTask(projectTitle, category) {
+    const newTask = {
+        id: Date.now() + Math.random(),
+        title: `Project: ${projectTitle}`,
+        description: `Build ${projectTitle} - ${category} project`,
+        category: 'roadmap',
+        priority: 'high',
+        dueDate: getEndOfMonth(),
+        completed: false,
+        createdAt: new Date().toISOString()
+    };
+    
+    tasks.push(newTask);
+    saveTasksData();
+    renderTasks();
+    
+    // Close modal
+    document.querySelector('.modal').remove();
+    
+    showNotification(`Project "${projectTitle}" added as task!`, 'success');
+    switchTab('general');
+}
+
+// Render skills progress
+function renderSkillsProgress() {
+    const skillsGrid = document.getElementById('skillsGrid');
+    
+    skillsGrid.innerHTML = roadmapData.skills.map(skill => {
+        const progress = calculateSkillProgress(skill);
+        return `
+            <div class="skill-card">
+                <div class="skill-header">
+                    <div class="skill-name">${skill.name}</div>
+                    <div class="skill-percentage">${progress}%</div>
+                </div>
+                <div class="skill-progress-bar">
+                    <div class="skill-progress-fill" style="width: ${progress}%"></div>
+                </div>
+                <div class="skill-topics">
+                    <span class="skill-topic">${skill.category}</span>
+                    <span class="skill-topic">${skill.totalTopics} topics</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Calculate skill progress based on completed weeks
+function calculateSkillProgress(skill) {
+    const relevantWeeks = roadmapData.months.flatMap(month => 
+        month.weeks.filter(week => 
+            week.skills.some(weekSkill => 
+                weekSkill.toLowerCase().includes(skill.name.toLowerCase().split(' ')[0])
+            )
+        ).map(week => `${month.month}-${week.week}`)
+    );
+    
+    const completedRelevantWeeks = relevantWeeks.filter(weekId => 
+        roadmapProgress.completedWeeks.includes(weekId)
+    );
+    
+    return relevantWeeks.length > 0 ? Math.round((completedRelevantWeeks.length / relevantWeeks.length) * 100) : 0;
+}
+
+// Update learning streak
+function updateLearningStreak() {
+    const today = new Date().toDateString();
+    const lastActiveDate = roadmapProgress.lastActiveDate;
+    
+    if (lastActiveDate === today) {
+        // Already updated today
+        return;
+    }
+    
+    if (lastActiveDate === new Date(Date.now() - 86400000).toDateString()) {
+        // Consecutive day
+        roadmapProgress.learningStreak++;
+    } else if (lastActiveDate !== today) {
+        // Reset streak if gap > 1 day
+        roadmapProgress.learningStreak = 1;
+    }
+    
+    roadmapProgress.lastActiveDate = today;
+    saveRoadmapProgress();
+}
+
+// Helper functions
+function getEndOfWeek() {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const daysUntilSunday = 7 - dayOfWeek;
+    const endOfWeek = new Date(today.getTime() + daysUntilSunday * 24 * 60 * 60 * 1000);
+    return endOfWeek.toISOString().split('T')[0];
+}
+
+function getEndOfMonth() {
+    const today = new Date();
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    return endOfMonth.toISOString().split('T')[0];
+}
+
+// Save roadmap progress
+function saveRoadmapProgress() {
+    userDataManager.setUserData('roadmapProgress', roadmapProgress);
 }
