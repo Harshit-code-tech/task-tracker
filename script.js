@@ -73,10 +73,8 @@ class UserDataManager {
             lastActiveDate: null
         });
         
-        // Re-render the UI with user-specific data
-        if (typeof initializeApp === 'function') {
-            initializeApp();
-        }
+        // Note: Don't call initializeApp() here to avoid circular reference
+        // The caller should handle UI updates
     }
 }
 
@@ -388,8 +386,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
-    // Ensure we have the latest user data
-    userDataManager.refreshUser();
+    // Ensure we have the latest user data (but don't call refreshUser to avoid circular reference)
+    userDataManager.initializeUser();
     
     renderGeneralTasks();
     renderDSAProblems();
@@ -404,6 +402,18 @@ function initializeApp() {
     if (firstTab) {
         switchTab(firstTab.dataset.tab);
     }
+}
+
+// Function to refresh app with new user data (called after login)
+function refreshAppWithUserData() {
+    userDataManager.refreshUser();
+    // Re-render everything
+    renderGeneralTasks();
+    renderDSAProblems();
+    renderNeetcodeProblems();
+    renderLearningHub();
+    updateStats();
+    updateAnalytics();
 }
 
 function setupEventListeners() {
