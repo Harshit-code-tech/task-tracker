@@ -117,3 +117,8 @@ redirect.html
 # Backup files
 *.backup
 *.bak
+
+
+# Roadmap
+roadmap/*
+addition/*

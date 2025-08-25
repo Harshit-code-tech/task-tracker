@@ -2726,13 +2726,21 @@ function markWeekComplete() {
 
 // View project ideas modal
 function viewProjectIdeas() {
+    // Check if modal already exists and remove it
+    const existingModal = document.querySelector('.project-ideas-modal-container');
+    if (existingModal) {
+        existingModal.remove();
+        return;
+    }
+    
     const modal = document.createElement('div');
-    modal.className = 'modal';
+    modal.className = 'modal project-ideas-modal-container';
+    modal.style.display = 'flex';
     modal.innerHTML = `
         <div class="modal-content project-ideas-modal">
             <div class="modal-header">
                 <h3>15 High-Value Project Ideas</h3>
-                <button class="close-btn" onclick="this.closest('.modal').remove()">&times;</button>
+                <button class="close-btn" onclick="closeProjectIdeasModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="projects-grid">
@@ -2756,7 +2764,22 @@ function viewProjectIdeas() {
         </div>
     `;
     
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeProjectIdeasModal();
+        }
+    });
+    
     document.body.appendChild(modal);
+}
+
+// Close project ideas modal
+function closeProjectIdeasModal() {
+    const modal = document.querySelector('.project-ideas-modal-container');
+    if (modal) {
+        modal.remove();
+    }
 }
 
 // Add project as task
@@ -2767,17 +2790,17 @@ function addProjectAsTask(projectTitle, category) {
         description: `Build ${projectTitle} - ${category} project`,
         category: 'roadmap',
         priority: 'high',
-        dueDate: getEndOfMonth(),
+        deadline: getEndOfMonth(),
         completed: false,
         createdAt: new Date().toISOString()
     };
     
     tasks.push(newTask);
-    saveTasksData();
-    renderTasks();
+    saveTasks();
+    renderGeneralTasks();
     
     // Close modal
-    document.querySelector('.modal').remove();
+    closeProjectIdeasModal();
     
     showNotification(`Project "${projectTitle}" added as task!`, 'success');
     switchTab('general');
@@ -2864,4 +2887,47 @@ function getEndOfMonth() {
 // Save roadmap progress
 function saveRoadmapProgress() {
     userDataManager.setUserData('roadmapProgress', roadmapProgress);
+}
+
+// Show notification function
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    // Style the notification
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 10000;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => {
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateX(0)';
+    }, 100);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
 }
