@@ -6,9 +6,17 @@ class UserDataManager {
     }
 
     initializeUser() {
-        const savedUser = localStorage.getItem('productivefire_user');
+        // Check both sessionStorage and localStorage for user data
+        const savedUser = sessionStorage.getItem('productivefire_user') || 
+                         sessionStorage.getItem('taskTrackerCurrentUser') ||
+                         localStorage.getItem('productivefire_user') ||
+                         localStorage.getItem('taskTrackerCurrentUser');
         if (savedUser) {
             this.currentUser = JSON.parse(savedUser);
+            // Ensure user data is also stored in localStorage for persistence
+            if (!localStorage.getItem('productivefire_user')) {
+                localStorage.setItem('productivefire_user', savedUser);
+            }
         }
     }
 
@@ -44,6 +52,31 @@ class UserDataManager {
         }
         
         keysToRemove.forEach(key => localStorage.removeItem(key));
+    }
+
+    // Refresh user data when authentication state changes
+    refreshUser() {
+        this.initializeUser();
+        // Reload user-specific data
+        tasks = this.getUserData('tasks', []);
+        neetcodeProgress = this.getUserData('neetcodeProgress', {});
+        dsaProgress = this.getUserData('dsaProgress', {});
+        algorithmsProgress = this.getUserData('algorithmsProgress', {});
+        personalCourses = this.getUserData('personalCourses', []);
+        roadmapProgress = this.getUserData('roadmapProgress', {
+            currentMonth: 1,
+            currentWeek: 1,
+            completedWeeks: [],
+            skillsProgress: {},
+            projectsCompleted: [],
+            learningStreak: 0,
+            lastActiveDate: null
+        });
+        
+        // Re-render the UI with user-specific data
+        if (typeof initializeApp === 'function') {
+            initializeApp();
+        }
     }
 }
 
@@ -355,6 +388,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
+    // Ensure we have the latest user data
+    userDataManager.refreshUser();
+    
     renderGeneralTasks();
     renderDSAProblems();
     renderNeetcodeProblems();

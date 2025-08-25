@@ -210,9 +210,12 @@ const AuthUtils = {
     
     // Session storage helpers (more secure, cleared on browser close)
     setUserData(userData) {
-        // Store in both formats for compatibility
-        sessionStorage.setItem('productivefire_user', JSON.stringify(userData));
-        sessionStorage.setItem('taskTrackerCurrentUser', JSON.stringify(userData));
+        // Store in both sessionStorage and localStorage for consistency
+        const userDataStr = JSON.stringify(userData);
+        sessionStorage.setItem('productivefire_user', userDataStr);
+        sessionStorage.setItem('taskTrackerCurrentUser', userDataStr);
+        localStorage.setItem('productivefire_user', userDataStr);
+        localStorage.setItem('taskTrackerCurrentUser', userDataStr);
     },
     
     getUserData() {
@@ -230,8 +233,11 @@ const AuthUtils = {
         sessionStorage.removeItem('taskTrackerCurrentUser');
         sessionStorage.removeItem('productivefire_token');
         sessionStorage.removeItem('authToken');
+        sessionStorage.removeItem('verification_email');
+        sessionStorage.removeItem('verification_name');
+        sessionStorage.removeItem('verification_password');
         
-        // Also clear any localStorage items from old versions
+        // Also clear localStorage items for consistency
         localStorage.removeItem('productivefire_user');
         localStorage.removeItem('taskTrackerCurrentUser');
         localStorage.removeItem('productivefire_token');
@@ -242,9 +248,11 @@ const AuthUtils = {
     },
     
     setToken(token) {
-        // Store in both formats for compatibility
+        // Store in both sessionStorage and localStorage for consistency
         sessionStorage.setItem('productivefire_token', token);
         sessionStorage.setItem('authToken', token);
+        localStorage.setItem('productivefire_token', token);
+        localStorage.setItem('authToken', token);
     },
     
     getToken() {

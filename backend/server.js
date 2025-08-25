@@ -1011,7 +1011,7 @@ app.get('/api/progress', authenticateToken, (req, res) => {
 });
 
 // Send OTP for signup verification
-app.post('/api/auth/send-signup-otp', authLimiter, [
+app.post('/api/auth/send-signup-otp', requireDatabaseConnection, authLimiter, [
     body('email').isEmail().normalizeEmail()
 ], async (req, res) => {
     try {
@@ -1185,36 +1185,42 @@ app.post('/api/auth/verify-signup', requireDatabaseConnection, authLimiter, [
                 }
             }
             
-            if (!otpDoc) {
-                // Enhanced debugging for OTP verification failures
-                const anyOtp = await Otp.findOne({ email, type: 'signup' });
-                const debugInfo = {
-                    email,
-                    provided: cleanOtp,
-                    providedLength: cleanOtp.length,
-                    providedType: typeof otp
-                };
-                
-                if (anyOtp) {
-                    debugInfo.stored = anyOtp.otp;
-                    debugInfo.storedLength = anyOtp.otp.length;
-                    debugInfo.storedType = typeof anyOtp.otp;
-                    debugInfo.expired = anyOtp.expiresAt < now;
-                    debugInfo.timeDiff = Math.round((now - anyOtp.expiresAt) / 1000); // seconds
-                    debugInfo.createdAt = anyOtp.createdAt;
-                    debugInfo.expiresAt = anyOtp.expiresAt;
-                    debugInfo.exactMatch = anyOtp.otp === cleanOtp;
-                    debugInfo.trimmedMatch = anyOtp.otp.trim() === cleanOtp;
-                    
-                    writeLog('ERROR', 'OTP verification failed - mismatch', debugInfo);
-                    return res.status(400).json({ error: 'Invalid verification code. Please check the code and try again.' });
-                } else {
-                    writeLog('ERROR', 'No OTP found for email', debugInfo);
-                    return res.status(400).json({ error: 'No verification code found. Please request a new code.' });
-                }
-            }
+        // Enhanced debugging for OTP verification failures
+        if (!otpDoc) {
+            // Enhanced debugging for OTP verification failures
+            const anyOtp = await Otp.findOne({ email, type: 'signup' });
+            const debugInfo = {
+                email,
+                provided: cleanOtp,
+                providedLength: cleanOtp.length,
+                providedType: typeof otp,
+                mongoState: mongoose.connection.readyState,
+                currentTime: now.toISOString()
+            };
             
-            writeLog('INFO', 'OTP verification successful', { 
+            if (anyOtp) {
+                debugInfo.stored = anyOtp.otp;
+                debugInfo.storedLength = anyOtp.otp.length;
+                debugInfo.storedType = typeof anyOtp.otp;
+                debugInfo.expired = anyOtp.expiresAt < now;
+                debugInfo.timeDiff = Math.round((now - anyOtp.expiresAt) / 1000); // seconds
+                debugInfo.createdAt = anyOtp.createdAt;
+                debugInfo.expiresAt = anyOtp.expiresAt;
+                debugInfo.exactMatch = anyOtp.otp === cleanOtp;
+                debugInfo.trimmedMatch = anyOtp.otp.trim() === cleanOtp;
+                
+                writeLog('ERROR', 'OTP verification failed - mismatch', debugInfo);
+                
+                if (anyOtp.expiresAt < now) {
+                    return res.status(400).json({ error: 'Verification code has expired. Please request a new code.' });
+                } else {
+                    return res.status(400).json({ error: 'Invalid verification code. Please check the code and try again.' });
+                }
+            } else {
+                writeLog('ERROR', 'No OTP found for email', debugInfo);
+                return res.status(400).json({ error: 'No verification code found. Please request a new code.' });
+            }
+        }            writeLog('INFO', 'OTP verification successful', { 
                 email, 
                 otpId: otpDoc._id,
                 timeSinceCreated: Math.round((now - otpDoc.createdAt) / 1000)

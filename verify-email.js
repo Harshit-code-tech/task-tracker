@@ -35,6 +35,17 @@ class EmailVerificationManager {
         this.userName = urlParams.get('name') || sessionStorage.getItem('verification_name');
         this.userPassword = sessionStorage.getItem('verification_password');
         
+        // Debug logging to understand data flow issues
+        console.log('Loading verification data:', {
+            emailFromUrl: urlParams.get('email'),
+            emailFromSession: sessionStorage.getItem('verification_email'),
+            nameFromUrl: urlParams.get('name'),
+            nameFromSession: sessionStorage.getItem('verification_name'),
+            passwordFromSession: !!sessionStorage.getItem('verification_password'),
+            finalEmail: this.userEmail,
+            finalName: this.userName
+        });
+        
         if (!this.userEmail) {
             toast.show('error', 'No email found for verification. Redirecting to signup...');
             setTimeout(() => {
@@ -42,11 +53,9 @@ class EmailVerificationManager {
             }, 2000);
             return;
         }
-        
+
         this.verificationEmailDisplay.textContent = this.userEmail;
-    }
-    
-    attachEventListeners() {
+    }    attachEventListeners() {
         // Form submission
         this.verificationForm.addEventListener('submit', (e) => this.handleVerificationSubmit(e));
         
@@ -159,7 +168,7 @@ class EmailVerificationManager {
             AuthUtils.showError('otpError', 'Please enter the complete 6-digit code');
             return;
         }
-        
+
         if (!this.userName || !this.userPassword) {
             toast.show('error', 'Missing signup data. Please start over.');
             setTimeout(() => {
@@ -167,15 +176,24 @@ class EmailVerificationManager {
             }, 2000);
             return;
         }
-        
+
         AuthUtils.showLoading('verifyBtn');
         
+        // Debug logging for troubleshooting
+        console.log('Verification attempt:', {
+            email: this.userEmail,
+            otpLength: otp.length,
+            namePresent: !!this.userName,
+            passwordPresent: !!this.userPassword,
+            baseUrl: AuthUtils.getBaseURL()
+        });
+
         try {
             const response = await AuthUtils.makeRequest('/auth/verify-signup', {
                 method: 'POST',
                 body: JSON.stringify({ 
                     email: this.userEmail, 
-                    otp: otp, 
+                    otp: otp.trim(), // Ensure no whitespace
                     name: this.userName, 
                     password: this.userPassword 
                 })
@@ -248,6 +266,8 @@ class EmailVerificationManager {
         AuthUtils.showLoading('resendCode');
         
         try {
+            console.log('Resending OTP for email:', this.userEmail);
+            
             const response = await AuthUtils.makeRequest('/auth/send-signup-otp', {
                 method: 'POST',
                 body: JSON.stringify({ 
